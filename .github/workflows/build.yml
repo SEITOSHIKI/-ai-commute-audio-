@@ -2,7 +2,7 @@ name: Build & Publish AI Commute Audio
 
 on:
   schedule:
-    - cron: "15 21 * * *"   # JST 06:15 相当（UTC基準）
+    - cron: "15 21 * * *"   # JST 06:15
   workflow_dispatch:
 
 jobs:
@@ -26,6 +26,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Install ffmpeg   # ← これを追加
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
+
       - name: Generate audio & feed
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -42,3 +48,4 @@ jobs:
           publish_branch: gh-pages
           publish_dir: output
           keep_files: true
+
