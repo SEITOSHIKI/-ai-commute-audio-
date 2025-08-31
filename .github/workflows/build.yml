@@ -3,7 +3,7 @@ name: Build & Publish AI Commute Audio
 on:
   workflow_dispatch:
   schedule:
-    # JST 05:00 は UTC 20:00（前日）
+    # JST 05:00 = UTC 20:00 (前日)
     - cron: "0 20 * * *"
 
 permissions:
@@ -12,8 +12,13 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: "ai-commute-audio"
   cancel-in-progress: false
+
+env:
+  PYTHONUNBUFFERED: "1"
+  # 任意：FEED_BASE_URL を Secrets に入れていない場合、自動で推定します（scripts/main.py側で判定）
+  # FEED_BASE_URL: https://<yourname>.github.io/<repo>
 
 jobs:
   build:
@@ -40,20 +45,22 @@ jobs:
       - name: Generate audio & feed
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }} # 使わないなら未設定でOK
           FEED_BASE_URL: ${{ secrets.FEED_BASE_URL }}
-          OPENAI_SUMMARY_MODEL: gpt-4o-mini
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           python -m scripts.main
 
-      - name: Upload artifact
+      - name: Upload artifact for Pages
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./output
+          path: output
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
