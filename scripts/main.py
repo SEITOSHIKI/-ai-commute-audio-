@@ -98,22 +98,45 @@ def summarize_with_openai(text: str, title: str, config: dict) -> str:
     )
     return resp.output_text.strip()
 
-# ===== TTS (OpenAI) =====
-def tts_openai(text: str, voice="alloy", model="gpt-4o-mini-tts", speaking_rate=1.05) -> AudioSegment:
+def tts_openai(text: str, voice="alloy", model="tts-1", speaking_rate=1.05) -> AudioSegment:
+    """
+    OpenAI TTSでMP3を生成してAudioSegmentにして返す。
+    失敗時は例外を投げてジョブを失敗させる（無音でごまかさない）。
+    """
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY が環境変数に設定されていません（Secretsに設定→workflowで渡してください）。")
+
     from openai import OpenAI
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    speech = client.audio.speech.create(model=model, voice=voice, input=text)
-    mp3_bytes = speech.audio  # プロバイダ仕様に応じて調整
+
+    # まずは非ストリーミングで（互換性が高い）
+    try:
+        resp = client.audio.speech.create(model=model, voice=voice, input=text)
+        mp3_bytes = getattr(resp, "content", None) or getattr(resp, "audio", None)
+        if not mp3_bytes:
+            raise RuntimeError("OpenAI TTS から音声バイトが取得できませんでした。")
+    except Exception as e:
+        # 非ストリーミングで失敗したらエラーメッセージを出して再throw
+        print(f"[ERROR] TTS failed (non-streaming): {e}")
+        raise
+
     seg = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
     if speaking_rate and speaking_rate != 1.0:
         seg = seg._spawn(seg.raw_data, overrides={"frame_rate": int(seg.frame_rate * speaking_rate)}).set_frame_rate(seg.frame_rate)
     return seg.set_frame_rate(44100).set_channels(2)
 
 def synthesize_items(texts, voice, model, rate):
+    """
+    各記事テキストを音声化。1件でも失敗したら例外で落とし、無音ポッドキャストを作らない。
+    """
+    print(f"[INFO] TTS items: {len(texts)}")
     segs = []
-    for t in texts:
+    for i, t in enumerate(texts, 1):
+        print(f"[INFO] TTS generating item {i}/{len(texts)} (chars={len(t)})")
         segs.append(tts_openai(t, voice=voice, model=model, speaking_rate=rate))
     return segs
+
+
 
 def concat_with_bump(segments, bump_ms=400):
     if not segments:
