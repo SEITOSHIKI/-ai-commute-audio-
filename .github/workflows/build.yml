@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: "ai-commute-audio"
@@ -19,7 +17,7 @@ env:
   PYTHONUNBUFFERED: "1"
 
 jobs:
-  build:
+  build_publish:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
@@ -29,13 +27,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "requirements.txt"
 
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Install ffmpeg & espeak
+      - name: Install ffmpeg & espeak-ng
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg espeak-ng
@@ -48,18 +48,11 @@ jobs:
         run: |
           python -m scripts.main
 
-      - name: Upload artifact for Pages
-        uses: actions/upload-pages-artifact@v3
+      # GitHub Pages を「ブランチ配信」にする想定
+      - name: Publish to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          path: output
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./output
+          # 既存履歴が壊れている場合は有効化（初回のみ）
+          # force_orphan: true
