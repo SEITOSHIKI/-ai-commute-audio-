@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 Generate daily AI commute podcast MP3 + RSS.
-強化ポイント:
-- OPENAI_API_KEYの妥当性チェック（*** 等の誤値で落ちる問題を事前検出）
-- TZ付き日時で RSS pubDate/lastBuildDate を生成（ValueError対策）
-- feed 必須フィールド（title/link/description）を常にセット
-- TTS失敗時は自動リトライ＆スキップ、ゼロ件ならフォールバック音声を生成
-- base_url を Secrets or 自動推定（余計なスペース除去）
-- mp3 length を実ファイルサイズで設定
-- 取得記事が薄いときも LLM で拡張（技術濃度/ユーモア）
+
+今回の修正点:
+- FEED_BASE_URL が "***" 等のダミーなら自動推定に切替
+- OpenAI Chat/TTS が接続エラーでも進行（フォールバック台本＋ローカルTTS）
+- OpenAI TTS: SDK差分 (format / response_format) に両対応
+- 取得ゼロ/短文でも番組が無音にならない安全策
+- RSS の日時は timezone 付き
 """
 
 import os
@@ -16,8 +15,6 @@ import io
 import re
 import sys
 import time
-import math
-import json
 import random
 import textwrap
 import traceback
@@ -29,8 +26,11 @@ import httpx
 import feedparser
 from feedgen.feed import FeedGenerator
 from pydub import AudioSegment
+import subprocess
+import tempfile
+import uuid
 
-# --------- util ---------
+# ---------- utils ----------
 
 def log(msg: str):
     print(msg, flush=True)
@@ -45,19 +45,21 @@ def read_yaml(path: str) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
+def is_placeholder(val: str | None) -> bool:
+    if not val:
+        return False
+    v = val.strip()
+    return (set(v) == {"*"} or v == "***" or v.lower().startswith("changeme"))
+
 def sanitize_base_url(url: str | None) -> str | None:
     if not url:
         return None
-    url = url.strip()
-    # 余計なスペース混入の事故対策
-    url = re.sub(r"\s+", "", url)
+    url = re.sub(r"\s+", "", url.strip())
+    if is_placeholder(url):
+        return None
     return url
 
 def infer_pages_base_url() -> str | None:
-    """
-    FEED_BASE_URL が未指定の場合に github.repository から推定
-    例: seitoshiki/-ai-commute-audio- -> https://seitoshiki.github.io/-ai-commute-audio-
-    """
     repo = os.getenv("GITHUB_REPOSITORY")  # owner/repo
     if not repo or "/" not in repo:
         return None
@@ -66,38 +68,35 @@ def infer_pages_base_url() -> str | None:
 
 def validate_openai_api_key():
     key = os.getenv("OPENAI_API_KEY", "").strip()
-    # GitHub の誤設定で "***" が入ると httpx が "Illegal header value b'***'" で落ちる
-    if not key or set(key) == {"*"} or key == "***":
-        raise RuntimeError(
-            "OPENAI_API_KEY が正しく設定されていません。"
-            "GitHub の Secrets に有効な API キー（例: sk- で始まる）を保存し、"
-            "Actions の再実行をしてください。"
-        )
-    # 新形式でも受け入れるが、露骨に短い/不正は弾く
+    if not key:
+        log("[WARN] OPENAI_API_KEY が未設定。LLM/TTSはフォールバックで実行します。")
+        return
+    if is_placeholder(key):
+        log("[WARN] OPENAI_API_KEY がプレースホルダーっぽい値です。フォールバックを使用します。")
+        os.environ["OPENAI_API_KEY"] = ""  # 無効化
+        return
     if len(key) < 20:
-        raise RuntimeError("OPENAI_API_KEY が不正な形式です。")
+        log("[WARN] OPENAI_API_KEY の長さが短すぎます。フォールバックを使用します。")
+        os.environ["OPENAI_API_KEY"] = ""
 
-# --------- news fetch ---------
+# ---------- fetch news ----------
 
 def google_news_rss_url(query: str, lang="ja", country="JP") -> str:
-    # "when:1d" のような修飾子は Google News の q= にそのまま含めてOK
     q = httpx.QueryParams({"q": query, "hl": lang, "gl": country, "ceid": f"{country}:{lang}"})
     return f"https://news.google.com/rss/search?{q}"
 
 def fetch_items_from_config(cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
     items: List[Dict[str, Any]] = []
-    # Google News
     for q in cfg["sources"].get("google_news_queries", []):
         url = google_news_rss_url(q)
         feed = feedparser.parse(url)
-        for e in feed.entries[:20]:  # 各クエリにつき上位20件
+        for e in feed.entries[:20]:
             items.append({
                 "title": e.get("title", ""),
                 "summary": e.get("summary", ""),
                 "link": e.get("link", ""),
                 "published": e.get("published", ""),
             })
-    # extra RSS
     for rss in cfg["sources"].get("extra_rss", []):
         feed = feedparser.parse(rss)
         for e in feed.entries[:20]:
@@ -115,10 +114,8 @@ def filter_items(items: List[Dict[str, Any]], cfg: Dict[str, Any]) -> List[Dict[
     exc = set(cfg["filters"].get("must_exclude_any", []))
     def ok(it):
         title = (it.get("title") or "") + " " + (it.get("summary") or "")
-        # include
         if inc and not any(k.lower() in title.lower() for k in inc):
             return False
-        # exclude
         if any(k.lower() in title.lower() for k in exc):
             return False
         return True
@@ -136,143 +133,229 @@ def pick_for_duration(items: List[Dict[str, Any]], cfg: Dict[str, Any]) -> List[
     log(f"[INFO] picked items: {len(picked)}")
     return picked
 
-# --------- LLM summary ---------
+# ---------- LLM summary (with fallback) ----------
 
 def openai_client():
     from openai import OpenAI
-    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-def build_prompt_style(cfg: Dict[str, Any]) -> str:
-    extra_topics = textwrap.dedent("""
-    追加トピックを適宜織り込む（最新海外AIニュース、松尾研究室、落合陽一、プロンプト・マルチエージェント、自律エージェント、論文、ビジネス活用、GitHub活用、深津式プロンプトの学び、簿記3級、経理転職、基本情報技術者、筋トレ）。
-    ただしURL・記号の読み上げは禁止。略語を一文字ずつ読むのも禁止（例：LLMは「エルエルエム」ではなく“エルエルエム”の単語として普通に）。
-    """).strip()
-    return f"{cfg['summary']['style']}\n{extra_topics}"
+    # タイムアウトを明示
+    return OpenAI(api_key=os.getenv("OPENAI_API_KEY") or None, timeout=60)
 
 SYSTEM_PROMPT = """あなたは日本語のオーディオ台本作成アシスタントです。
-出力は以下2部構成：
-(1) 一人語り：導入→ニュースの要点→背景→技術の肝→現実的な活用→オチの一言。カジュアルでテンポよく、比喩を少なく、内容は濃く。
-(2) 二人語り：司会と相棒の短い掛け合い（最大30秒）。相棒は時々ツッコミやユーモア。
-禁止事項：URL、記号列の読み上げ、出典の羅列、長すぎる前置き。
+出力は2部構成：
+(1) 一人語り：導入→要点→背景→技術の肝→実務活用→一言。
+(2) 二人語り：司会と相棒の軽い掛け合い（最大30秒）。
+禁止：URL、記号列の読み上げ、出典の羅列、冗長な前置き。
+砕けたトーンだが内容は濃く、ユーモアは控えめにキメる。
 """
 
+def build_prompt_style(cfg: Dict[str, Any]) -> str:
+    extra = textwrap.dedent("""
+    追加トピックを自然に織り込む（海外AI動向、松尾研究室、落合陽一、プロンプト／マルチエージェント、自律エージェント、論文、ビジネス活用、GitHub活用、深津式プロンプト、簿記3級、経理転職、基本情報技術者、筋トレ）。
+    URLや記号列は絶対に読まない。略語は一文字ずつ読まず単語として自然に。
+    """).strip()
+    return f"{cfg['summary']['style']}\n{extra}"
+
 def summarize_with_openai(items: List[Dict[str, Any]], cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
-    client = openai_client()
-    style = build_prompt_style(cfg)
     out: List[Dict[str, Any]] = []
+    use_openai = bool(os.getenv("OPENAI_API_KEY"))
+    client = openai_client() if use_openai else None
+    style = build_prompt_style(cfg)
+
     for idx, it in enumerate(items, 1):
         base = f"タイトル: {it.get('title','')}\n要約: {it.get('summary','')}\n"
         user = f"{base}\nこの話題について、{style}\n文字数:{cfg['summary']['max_chars_per_item']}字以内で。"
-        # リトライ
-        for attempt in range(3):
-            try:
-                resp = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    temperature=cfg["summary"]["temperature"],
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": user}
-                    ],
-                )
-                text = resp.choices[0].message.content.strip()
-                # URLや余計な括弧の除去
-                text = re.sub(r"https?://\S+", "", text)
-                text = text.replace("()", "")
-                out.append({
-                    "title": it.get("title",""),
-                    "text": text
-                })
-                break
-            except Exception as e:
-                log(f"[WARN] LLM summarize failed {idx} try={attempt+1}: {e}")
-                time.sleep(2 * (attempt + 1))
-        else:
-            # 失敗時フォールバック
-            out.append({
-                "title": it.get("title",""),
-                "text": f"話題「{it.get('title','')}」について：要点、背景、技術、影響を簡潔に紹介します。"
-            })
+        text: str | None = None
+
+        if use_openai:
+            for attempt in range(3):
+                try:
+                    resp = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        temperature=cfg["summary"]["temperature"],
+                        messages=[
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": user}
+                        ],
+                    )
+                    t = resp.choices[0].message.content.strip()
+                    t = re.sub(r"https?://\S+", "", t)
+                    t = t.replace("()", "")
+                    text = t
+                    break
+                except Exception as e:
+                    log(f"[WARN] LLM summarize failed {idx} try={attempt+1}: {e}")
+                    time.sleep(2 * (attempt + 1))
+
+        if not text:
+            # フォールバック台本（URLや記号を除去）
+            title = (it.get("title") or "").strip()
+            summ = re.sub(r"https?://\S+", "", (it.get("summary") or "").strip())
+            summ = re.sub(r"\s+", " ", summ)
+            text = (
+                f"一人語り：今日は「{title}」。要点はこう。{summ}。"
+                "背景では何がボトルネックだったのか、実はデータと運用。"
+                "技術の肝は、モデルの前処理と評価設計。実務ではワークフローのどこに刺すかが勝負。"
+                "最後に一言、ツールは使い倒して初めて資産。 \n"
+                "二人語り：司会『これ、どこがすごい？』 相棒『地味に運用が楽になる点。派手さより現場力！』"
+            )
+
+        out.append({"title": it.get("title",""), "text": text})
+
     log(f"[INFO] texts_for_tts: {len(out)}")
     return out
 
-# --------- TTS ---------
+# ---------- TTS: OpenAI -> espeak-ng fallback ----------
 
-def tts_openai(text: str, voice: str, model: str, speaking_rate: float, bitrate_kbps: int) -> AudioSegment:
-    """
-    OpenAI TTS（非ストリーミング）。接続エラーは数回リトライ。
-    """
-    from openai import APIConnectionError
-    client = openai_client()
+def tts_espeak(text: str, lang: str = "ja", speed_wpm: int = 180, pitch: int = 50) -> AudioSegment:
+    """ローカルTTS（ネット不要）。espeak-ng で wav を生成して読み込む。"""
+    with tempfile.TemporaryDirectory() as td:
+        wav_path = os.path.join(td, "out.wav")
+        # espeak-ng -v ja -s 180 -p 50 -w out.wav "text"
+        cmd = ["espeak-ng", "-v", lang, "-s", str(speed_wpm), "-p", str(pitch), "-w", wav_path, text]
+        subprocess.run(cmd, check=True)
+        seg = AudioSegment.from_wav(wav_path)
+    return seg
 
-    # 長文をチャンクに分割
+def _openai_tts_request(client, **kwargs):
+    """
+    SDK差分対策：response_format / format 両対応で呼び分ける。
+    """
+    try:
+        return client.audio.speech.create(**kwargs)
+    except TypeError as e:
+        msg = str(e)
+        if "unexpected keyword argument 'response_format'" in msg:
+            kwargs.pop("response_format", None)
+            kwargs["format"] = "mp3"
+            return client.audio.speech.create(**kwargs)
+        if "unexpected keyword argument 'format'" in msg:
+            kwargs.pop("format", None)
+            kwargs["response_format"] = "mp3"
+            return client.audio.speech.create(**kwargs)
+        raise
+
+def _bytes_from_openai_tts_response(client, model, voice, text) -> bytes:
+    """
+    いくつかのSDK版を吸収して mp3 バイトを取り出す。
+    """
+    # 1) 非ストリーミング（できればこれで）
+    try:
+        resp = _openai_tts_request(
+            client,
+            model=model,
+            voice=voice,
+            input=text,
+            response_format="mp3",
+        )
+        if hasattr(resp, "content") and resp.content:
+            return resp.content  # 現行版
+        # 古い版のフォールバックいろいろ
+        if hasattr(resp, "read"):
+            return resp.read()
+        if isinstance(resp, (bytes, bytearray)):
+            return bytes(resp)
+    except Exception as e:
+        log(f"[WARN] TTS non-streaming path failed: {e}")
+
+    # 2) ストリーミング
+    try:
+        from openai import Stream
+        tmp_path = os.path.join(tempfile.gettempdir(), f"tts_{uuid.uuid4().hex}.mp3")
+        with client.audio.speech.with_streaming_response.create(
+            model=model, voice=voice, input=text, response_format="mp3"
+        ) as stream:
+            stream.stream_to_file(tmp_path)
+        with open(tmp_path, "rb") as f:
+            return f.read()
+    except Exception as e:
+        log(f"[WARN] TTS streaming path failed: {e}")
+        raise
+
+def tts_openai_or_fallback(text: str, voice: str, model: str, speaking_rate: float) -> AudioSegment:
+    """
+    まず OpenAI TTS（分割＆多段互換）。失敗したら espeak-ng にフォールバック。
+    """
+    use_openai = bool(os.getenv("OPENAI_API_KEY"))
+    # チャンク分割
     chunk_size = 700
-    chunks = []
-    buf = ""
-    for line in text.splitlines():
-        if len(buf) + len(line) + 1 > chunk_size:
+    lines = text.splitlines()
+    chunks, buf = [], ""
+    for ln in lines:
+        if len(buf) + len(ln) + 1 > chunk_size:
             if buf:
                 chunks.append(buf)
                 buf = ""
-        buf += (line + " ")
+        buf += (ln + " ")
     if buf:
         chunks.append(buf)
 
     segments: List[AudioSegment] = []
-    for i, ch in enumerate(chunks, 1):
-        for attempt in range(3):
-            try:
-                audio = client.audio.speech.create(
-                    model=model,
-                    voice=voice,
-                    input=ch,
-                    format="mp3",
-                    speed=speaking_rate,
-                )
-                mp3_bytes = audio.content  # SDK v1.44 以降
-                seg = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
-                segments.append(seg)
-                break
-            except APIConnectionError as e:
-                log(f"[WARN] TTS connection error (retry) part={i}: {e}")
-                time.sleep(2 * (attempt + 1))
-            except Exception as e:
-                log(f"[WARN] TTS failed part={i}: {e}")
-                time.sleep(1)
-                break  # 次のチャンクへ（このチャンクは諦める）
 
+    if use_openai:
+        from openai import APIConnectionError
+        client = openai_client()
+        for i, ch in enumerate(chunks, 1):
+            ok = False
+            for attempt in range(3):
+                try:
+                    mp3_bytes = _bytes_from_openai_tts_response(client, model, voice, ch)
+                    seg = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
+                    segments.append(seg)
+                    ok = True
+                    break
+                except APIConnectionError as e:
+                    log(f"[WARN] TTS connection error (retry) part={i}: {e}")
+                    time.sleep(2 * (attempt + 1))
+                except TypeError as e:
+                    log(f"[WARN] TTS signature mismatch part={i}: {e}")
+                    time.sleep(1)
+                except Exception as e:
+                    log(f"[WARN] TTS failed part={i}: {e}")
+                    time.sleep(1)
+                    break  # このチャンクは諦め、次へ
+            if not ok:
+                log(f"[WARN] OpenAI TTS fallback to espeak for part={i}")
+                try:
+                    segments.append(tts_espeak(ch, lang="ja", speed_wpm=int(180 * (1.0 / max(0.5, min(2.0, speaking_rate)))), pitch=50))
+                except Exception as e:
+                    log(f"[WARN] espeak fallback failed part={i}: {e}")
+
+    else:
+        # APIキーなし：全部ローカルTTS
+        for ch in chunks:
+            segments.append(tts_espeak(ch, lang="ja", speed_wpm=180, pitch=50))
+
+    # 結合
+    segments = [s for s in segments if s is not None]
     if not segments:
         raise RuntimeError("TTSがすべて失敗しました。APIキーやネットワーク設定を確認してください。")
-
     out = segments[0]
     for s in segments[1:]:
         out += s
     return out
 
-# --------- Build program ---------
+# ---------- Build program ----------
 
 def build_program_from_texts(texts: List[Dict[str, Any]], cfg: Dict[str, Any]) -> AudioSegment:
     voice = cfg["tts"]["voice"]
     model = cfg["tts"]["model"]
     rate = float(cfg["tts"]["speaking_rate"])
-    bitrate_k = int(cfg["tts"]["output_bitrate"])
 
     intro_text = "通勤AIニュース。今日も技術濃度高めでいきます。"
     outro_text = "以上、通勤AIニュースでした。良い一日を！"
 
-    program = AudioSegment.silent(duration=300)  # 0.3秒の無音で開始ブツ切れ防止
+    program = AudioSegment.silent(duration=300)
     try:
-        program += tts_openai(intro_text, voice, model, rate, bitrate_k)
+        program += tts_openai_or_fallback(intro_text, voice, model, rate)
     except Exception as e:
         log(f"[WARN] intro TTS failed: {e}")
 
-    # 本編
     item_ok = 0
     for i, t in enumerate(texts, 1):
         try:
             program += AudioSegment.silent(duration=200)
             head = f"トピック {i}。{t['title']}。"
-            body = t["text"]
-            seg = tts_openai(head + "\n" + body, voice, model, rate, bitrate_k)
+            seg = tts_openai_or_fallback(head + "\n" + t["text"], voice, model, rate)
             program += seg
             item_ok += 1
         except Exception as e:
@@ -280,19 +363,18 @@ def build_program_from_texts(texts: List[Dict[str, Any]], cfg: Dict[str, Any]) -
 
     try:
         program += AudioSegment.silent(duration=200)
-        program += tts_openai(outro_text, voice, model, rate, bitrate_k)
+        program += tts_openai_or_fallback(outro_text, voice, model, rate)
     except Exception as e:
         log(f"[WARN] outro TTS failed: {e}")
 
-    # 全滅フォールバック
     if item_ok == 0:
         log("[WARN] no items succeeded; building fallback audio")
-        fallback = "今日は技術的な問題で短縮版です。明日はもっと面白く、濃い話をお届けします。"
-        program = tts_openai(fallback, voice, model, rate, bitrate_k)
+        fallback = "今日は技術的な問題で短縮版です。明日はもっと濃い話をお届けします。"
+        program = tts_openai_or_fallback(fallback, voice, model, rate)
 
     return program
 
-# --------- RSS ---------
+# ---------- RSS ----------
 
 def build_and_save_podcast(mp3_path: str, out_dir: str, base_url: str, site_title: str, site_author: str, site_desc: str):
     fg = FeedGenerator()
@@ -305,7 +387,6 @@ def build_and_save_podcast(mp3_path: str, out_dir: str, base_url: str, site_titl
     fg.lastBuildDate(now)
     fg.generator('python-feedgen')
 
-    # item
     title = f"{site_title} {dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).date()}"
     fe = fg.add_entry()
     fe.title(title)
@@ -317,20 +398,18 @@ def build_and_save_podcast(mp3_path: str, out_dir: str, base_url: str, site_titl
     fe.enclosure(mp3_url, str(size), 'audio/mpeg')
     fe.pubDate(now)
 
-    # write feed
     ensure_dir(out_dir)
     xml = fg.rss_str(pretty=True)
     with open(os.path.join(out_dir, "feed.xml"), "wb") as f:
         f.write(xml)
 
-# --------- main ---------
+# ---------- main ----------
 
 def main():
     validate_openai_api_key()
 
     cfg = read_yaml("config.yaml")
 
-    # base_url決定（優先度：config.yaml > Secrets(FEED_BASE_URL) > 自動推定）
     base_url = sanitize_base_url(cfg["site"].get("base_url")) or \
                sanitize_base_url(os.getenv("FEED_BASE_URL")) or \
                sanitize_base_url(infer_pages_base_url())
@@ -338,15 +417,12 @@ def main():
         raise RuntimeError("base_url を決定できませんでした。config.yaml か Secrets:FEED_BASE_URL を設定してください。")
     log(f"[INFO] base_url = {base_url}")
 
-    # 記事収集→フィルタ→選定
     items = fetch_items_from_config(cfg)
     items = filter_items(items, cfg)
     items = pick_for_duration(items, cfg)
 
-    # LLM要約（技術濃度＆ユーモア）
     texts = summarize_with_openai(items, cfg)
 
-    # 音声合成
     out_dir = "output"
     ensure_dir(out_dir)
     today = dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).strftime("%Y-%m-%d")
@@ -354,11 +430,9 @@ def main():
     mp3_path = os.path.join(out_dir, mp3_name)
 
     program = build_program_from_texts(texts, cfg)
-    # 注意: export時のbitrateはpydubの引数で指定（_thing_）
     program.export(mp3_path, format="mp3", bitrate=f"{cfg['tts']['output_bitrate']}k")
     log(f"[INFO] mp3 saved: {mp3_path} size={os.path.getsize(mp3_path)}")
 
-    # RSS生成
     build_and_save_podcast(
         mp3_path=mp3_path,
         out_dir=out_dir,
