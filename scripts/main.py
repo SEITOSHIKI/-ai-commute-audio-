@@ -1,4 +1,4 @@
-import os, io, glob, math, datetime as dt
+import os, io, glob, datetime as dt
 from dateutil import tz
 import yaml
 import feedparser, trafilatura
@@ -102,8 +102,15 @@ def summarize_with_openai(text: str, title: str, config: dict) -> str:
 def tts_openai(text: str, voice="alloy", model="gpt-4o-mini-tts", speaking_rate=1.05) -> AudioSegment:
     from openai import OpenAI
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    speech = client.audio.speech.create(model=model, voice=voice, input=text)
-    mp3_bytes = speech.audio  # プロバイダ仕様に応じて調整
+    # SDKにより戻り値の属性名が異なるケースに備えて分岐
+    resp = client.audio.speech.create(model=model, voice=voice, input=text)
+    mp3_bytes = getattr(resp, "content", None) or getattr(resp, "audio", None)
+    if mp3_bytes is None:
+        # ストリーミングAPIのフォールバック
+        with client.audio.speech.with_streaming_response.create(model=model, voice=voice, input=text) as stream:
+            buf = io.BytesIO()
+            stream.stream_to_file(buf)  # SDKにより不可のことがあるので念のため下で取り出し
+            mp3_bytes = buf.getvalue()
     seg = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
     if speaking_rate and speaking_rate != 1.0:
         seg = seg._spawn(seg.raw_data, overrides={"frame_rate": int(seg.frame_rate * speaking_rate)}).set_frame_rate(seg.frame_rate)
@@ -112,7 +119,11 @@ def tts_openai(text: str, voice="alloy", model="gpt-4o-mini-tts", speaking_rate=
 def synthesize_items(texts, voice, model, rate):
     segs = []
     for t in texts:
-        segs.append(tts_openai(t, voice=voice, model=model, speaking_rate=rate))
+        try:
+            segs.append(tts_openai(t, voice=voice, model=model, speaking_rate=rate))
+        except Exception:
+            # 1件失敗しても続行
+            segs.append(AudioSegment.silent(duration=800))
     return segs
 
 def concat_with_bump(segments, bump_ms=400):
@@ -128,20 +139,30 @@ def concat_with_bump(segments, bump_ms=400):
 def build_and_save_podcast(mp3_path: str, out_dir: str, base_url: str, title: str, author: str):
     os.makedirs(out_dir, exist_ok=True)
     fg = FeedGenerator(); fg.load_extension('podcast')
-    fg.id(base_url + "/feed.xml"); fg.title(title); fg.author({'name': author})
-    fg.link(href=base_url, rel='alternate'); fg.language('ja'); fg.pubDate(dt.datetime.now(dt.timezone.utc))
+    # ---- 必須フィールド（title / link / description）を満たす ----
+    fg.id(base_url + "/feed.xml")
+    fg.title(title)
+    fg.link(href=base_url, rel='alternate')
+    fg.description("通勤向け：AI関連ニュースの音声ダイジェスト（日本語）")
+    fg.language('ja')
+    fg.pubDate(dt.datetime.now(dt.timezone.utc))
 
+    # エピソード（当日分）
     fe = fg.add_entry()
-    fe.id(base_url + "/" + os.path.basename(mp3_path))
+    fe_id = base_url + "/" + os.path.basename(mp3_path)
+    fe.id(fe_id)
     fe.title(title + " " + dt.datetime.now().strftime("%Y-%m-%d"))
-    fe.enclosure(base_url + "/" + os.path.basename(mp3_path), 0, 'audio/mpeg')
+    fe.enclosure(fe_id, 0, 'audio/mpeg')
     fe.pubDate(dt.datetime.now(dt.timezone.utc))
+    fe.description("本日の主要AIニュースを、日本語でやさしく要点解説。")
 
     xml = fg.rss_str(pretty=True)
+    # 日付ディレクトリ配下と output 直下の両方に feed.xml を書き出す
     with open(os.path.join(out_dir, "feed.xml"), "wb") as f:
         f.write(xml)
     with open(os.path.join(os.path.dirname(out_dir), "feed.xml"), "wb") as f:
         f.write(xml)
+
 # ===== Select & Orchestrate =====
 def pick_items(items, config):
     must_any = set(config["filters"].get("must_include_any", []))
@@ -177,8 +198,9 @@ def main():
         script = f"見出し: {it['title'].strip()}\n\n{summ}\n\n出典URL: {it.get('link','')}" if config["summary"].get("include_source", True) else f"見出し: {it['title'].strip()}\n\n{summ}"
         texts_for_tts.append(script)
 
+    # アイテムがゼロでも空サウンドでRSSを出力できるようにする
     voice = config["tts"]["voice"]; model = config["tts"]["model"]; rate = float(config["tts"]["speaking_rate"])
-    segs = synthesize_items(texts_for_tts, voice=voice, model=model, rate=rate)
+    segs = synthesize_items(texts_for_tts, voice=voice, model=model, rate=rate) if texts_for_tts else [AudioSegment.silent(duration=2000)]
 
     program = concat_with_bump(segs, bump_ms=400)
     mp3_path = os.path.join(out_dir, f"{day}-ai-commute.mp3")
@@ -208,3 +230,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
