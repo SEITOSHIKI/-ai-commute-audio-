@@ -1,442 +1,378 @@
 # -*- coding: utf-8 -*-
-import os, io, re, time, random, math, datetime as dt, urllib.parse as up
-from typing import List, Dict, Tuple
+"""
+Generate daily AI commute podcast MP3 + RSS.
+強化ポイント:
+- OPENAI_API_KEYの妥当性チェック（*** 等の誤値で落ちる問題を事前検出）
+- TZ付き日時で RSS pubDate/lastBuildDate を生成（ValueError対策）
+- feed 必須フィールド（title/link/description）を常にセット
+- TTS失敗時は自動リトライ＆スキップ、ゼロ件ならフォールバック音声を生成
+- base_url を Secrets or 自動推定（余計なスペース除去）
+- mp3 length を実ファイルサイズで設定
+- 取得記事が薄いときも LLM で拡張（技術濃度/ユーモア）
+"""
 
-import yaml, feedparser, trafilatura
+import os
+import io
+import re
+import sys
+import time
+import math
+import json
+import random
+import textwrap
+import traceback
+import datetime as dt
+from typing import List, Dict, Any
+
+import yaml
+import httpx
+import feedparser
 from feedgen.feed import FeedGenerator
 from pydub import AudioSegment
 
-# --------------------------- 共通ユーティリティ ---------------------------
+# --------- util ---------
 
-def load_config(path: str = "config.yaml") -> Dict:
+def log(msg: str):
+    print(msg, flush=True)
+
+def utcnow():
+    return dt.datetime.now(dt.timezone.utc)
+
+def ensure_dir(p: str):
+    os.makedirs(p, exist_ok=True)
+
+def read_yaml(path: str) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
-def now_utc() -> dt.datetime:
-    return dt.datetime.now(dt.timezone.utc)
+def sanitize_base_url(url: str | None) -> str | None:
+    if not url:
+        return None
+    url = url.strip()
+    # 余計なスペース混入の事故対策
+    url = re.sub(r"\s+", "", url)
+    return url
 
-def get_env_strict(name: str) -> str:
-    v = os.getenv(name, "")
-    if not v:
-        raise RuntimeError(f"{name} が未設定です（Settings → Secrets and variables → Actions に追加）。")
-    return v
+def infer_pages_base_url() -> str | None:
+    """
+    FEED_BASE_URL が未指定の場合に github.repository から推定
+    例: seitoshiki/-ai-commute-audio- -> https://seitoshiki.github.io/-ai-commute-audio-
+    """
+    repo = os.getenv("GITHUB_REPOSITORY")  # owner/repo
+    if not repo or "/" not in repo:
+        return None
+    owner, repo_name = repo.split("/", 1)
+    return f"https://{owner.lower()}.github.io/{repo_name}"
 
-def sanitize_openai_key(raw: str) -> str:
-    key = raw.strip().strip('"').strip("'").replace("\r", "").replace("\n", "")
-    if any(ord(c) < 33 or ord(c) == 127 for c in key):
-        raise RuntimeError("OPENAI_API_KEY に改行/制御文字/空白が混入。貼り直してください。")
-    return key
+def validate_openai_api_key():
+    key = os.getenv("OPENAI_API_KEY", "").strip()
+    # GitHub の誤設定で "***" が入ると httpx が "Illegal header value b'***'" で落ちる
+    if not key or set(key) == {"*"} or key == "***":
+        raise RuntimeError(
+            "OPENAI_API_KEY が正しく設定されていません。"
+            "GitHub の Secrets に有効な API キー（例: sk- で始まる）を保存し、"
+            "Actions の再実行をしてください。"
+        )
+    # 新形式でも受け入れるが、露骨に短い/不正は弾く
+    if len(key) < 20:
+        raise RuntimeError("OPENAI_API_KEY が不正な形式です。")
 
-URL_RE = re.compile(r"https?://\S+|www\.\S+")
-HEXISH_RE = re.compile(r"\b[0-9A-Za-z]{8,}\b")
-CODE_LINE_RE = re.compile(r"^[>\-\*\#\s]*[`~]{1,3}.*$", re.MULTILINE)
+# --------- news fetch ---------
 
-def clean_for_speech(text: str) -> str:
-    text = URL_RE.sub("", text)
-    text = CODE_LINE_RE.sub("", text)
-    text = HEXISH_RE.sub("（識別子）", text)
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+def google_news_rss_url(query: str, lang="ja", country="JP") -> str:
+    # "when:1d" のような修飾子は Google News の q= にそのまま含めてOK
+    q = httpx.QueryParams({"q": query, "hl": lang, "gl": country, "ceid": f"{country}:{lang}"})
+    return f"https://news.google.com/rss/search?{q}"
 
-# --------------------------- ニュース取得 ---------------------------
-
-def _gn_rss_url(query: str) -> str:
-    cleaned = re.sub(r"\bwhen:\S+\b", "", query).strip()
-    return "https://news.google.com/rss/search?q=" + up.quote(cleaned) + "&hl=ja&gl=JP&ceid=JP:ja"
-
-def fetch_bucket_items(bucket_name: str, bucket_cfg: Dict) -> List[Dict]:
-    items = []
-    for q in bucket_cfg.get("google_news_queries", []) or []:
-        d = feedparser.parse(_gn_rss_url(q))
-        for e in d.entries:
+def fetch_items_from_config(cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
+    items: List[Dict[str, Any]] = []
+    # Google News
+    for q in cfg["sources"].get("google_news_queries", []):
+        url = google_news_rss_url(q)
+        feed = feedparser.parse(url)
+        for e in feed.entries[:20]:  # 各クエリにつき上位20件
             items.append({
-                "bucket": bucket_name,
-                "title": e.get("title", "").strip(),
-                "link": e.get("link", "").strip(),
-                "summary": e.get("summary", "").strip(),
+                "title": e.get("title", ""),
+                "summary": e.get("summary", ""),
+                "link": e.get("link", ""),
                 "published": e.get("published", ""),
             })
-    for url in bucket_cfg.get("extra_rss", []) or []:
-        d = feedparser.parse(url)
-        for e in d.entries:
+    # extra RSS
+    for rss in cfg["sources"].get("extra_rss", []):
+        feed = feedparser.parse(rss)
+        for e in feed.entries[:20]:
             items.append({
-                "bucket": bucket_name,
-                "title": e.get("title", "").strip(),
-                "link": e.get("link", "").strip(),
-                "summary": e.get("summary", "").strip(),
+                "title": e.get("title", ""),
+                "summary": e.get("summary", ""),
+                "link": e.get("link", ""),
                 "published": e.get("published", ""),
             })
-    # 重複除去
-    seen = set(); dedup = []
-    for it in items:
-        key = it["link"] or (it["title"], it["published"])
-        if key in seen: continue
-        seen.add(key); dedup.append(it)
-    return dedup
+    log(f"[INFO] fetched items: {len(items)}")
+    return items
 
-def fetch_all_items(cfg: Dict) -> List[Dict]:
-    buckets = cfg.get("sources", {}).get("topic_buckets", {}) or {}
-    all_items = []
-    for bname, bcfg in buckets.items():
-        all_items += fetch_bucket_items(bname, bcfg)
-    print(f"[INFO] fetched total items: {len(all_items)}")
-    return all_items
+def filter_items(items: List[Dict[str, Any]], cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
+    inc = set(cfg["filters"].get("must_include_any", []))
+    exc = set(cfg["filters"].get("must_exclude_any", []))
+    def ok(it):
+        title = (it.get("title") or "") + " " + (it.get("summary") or "")
+        # include
+        if inc and not any(k.lower() in title.lower() for k in inc):
+            return False
+        # exclude
+        if any(k.lower() in title.lower() for k in exc):
+            return False
+        return True
+    out = [it for it in items if ok(it)]
+    log(f"[INFO] filtered items: {len(out)}")
+    return out
 
-# --------------------------- フィルタリング & 選定 ---------------------------
+def pick_for_duration(items: List[Dict[str, Any]], cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
+    random.shuffle(items)
+    target_min = cfg["schedule"]["target_total_minutes"]
+    per_min = (cfg["schedule"]["per_item_seconds_min"] + cfg["schedule"]["per_item_seconds_max"]) / 2 / 60
+    max_items = cfg["schedule"]["max_items"]
+    n = min(max_items, max(5, int(target_min / per_min)))
+    picked = items[:n]
+    log(f"[INFO] picked items: {len(picked)}")
+    return picked
 
-def passes_filters(title: str, summary: str, cfg: Dict) -> bool:
-    fcfg = cfg.get("filters", {})
-    inc = [w.lower() for w in fcfg.get("must_include_any", [])]
-    exc = [w.lower() for w in fcfg.get("must_exclude_any", [])]
-    text = f"{title} {summary}".lower()
-    if inc and not any(w in text for w in inc):
-        return False
-    if any(w in text for w in exc):
-        return False
-    return True
-
-def filter_items(items: List[Dict], cfg: Dict) -> List[Dict]:
-    return [it for it in items if passes_filters(it["title"], it.get("summary",""), cfg) or it["bucket"] not in ("ai_global","ai_jp_art")]
-
-def select_mixed_items(items: List[Dict], cfg: Dict) -> List[Dict]:
-    """
-    各バケットの required_min を満たすようにピックし、足りなければ他で補完。
-    また、トピック不足時は 'synthetic' フラグ付きのプレースホルダを生成して穴埋め。
-    """
-    buckets_cfg = cfg.get("sources", {}).get("topic_buckets", {}) or {}
-    by_bucket: Dict[str,List[Dict]] = {}
-    for it in items:
-        by_bucket.setdefault(it["bucket"], []).append(it)
-
-    max_items = int(cfg.get("schedule", {}).get("max_items", 5))
-    picked: List[Dict] = []
-
-    # 1) required_min を確保
-    for bname, bcfg in buckets_cfg.items():
-        need = int(bcfg.get("required_min", 0))
-        pool = by_bucket.get(bname, [])
-        random.shuffle(pool)
-        for it in pool[:need]:
-            if len(picked) < max_items:
-                picked.append(it)
-
-    # 2) 余った枠を人気バケットから（AI系を優先）
-    priority = ["ai_global","ai_jp_art","it_fe","career_accounting","accounting_boki3","fitness"]
-    for bname in priority:
-        if len(picked) >= max_items: break
-        pool = by_bucket.get(bname, [])
-        random.shuffle(pool)
-        for it in pool:
-            if len(picked) >= max_items: break
-            if it not in picked:
-                picked.append(it)
-
-    # 3) 足りなければ合成トピックで埋める（synthetic）
-    topics_for_synth = [
-        ("accounting_boki3","簿記3級の要点（仕訳・試算表・財務三表のつながり）"),
-        ("career_accounting","経理の志望動機・転職市場の今と差別化ポイント"),
-        ("it_fe","基本情報技術者（アルゴリズム/ネットワーク/セキュリティ）の頻出論点"),
-        ("fitness","筋トレ：週3・45分で伸ばすメニューと栄養の基本"),
-        ("ai_global","海外AIトレンドの俯瞰と日本企業への示唆"),
-        ("ai_jp_art","松尾研/落合陽一に見る日本発のAIと表現の交差点")
-    ]
-    t_idx = 0
-    while len(picked) < max_items and t_idx < len(topics_for_synth):
-        b, title = topics_for_synth[t_idx]
-        picked.append({"bucket": b, "title": title, "link": "", "summary": "", "published": "", "synthetic": True})
-        t_idx += 1
-
-    # 4) 上限カット
-    return picked[:max_items]
-
-# --------------------------- 文字量計画 ---------------------------
-
-def plan_lengths(n_items: int, cfg: Dict, speaking_rate: float) -> Tuple[List[int], int]:
-    sch = cfg.get("schedule", {})
-    tgt_total = int(sch.get("target_total_minutes", 32)) * 60
-    s_min = int(sch.get("per_item_seconds_min", 200))
-    s_max = int(sch.get("per_item_seconds_max", 420))
-    bonus_sec = int(cfg.get("summary", {}).get("bonus_tip_seconds", 0)) if cfg.get("summary", {}).get("include_bonus_tip") else 0
-
-    if n_items <= 0: return [], 0
-    ideal = max(s_min, min(s_max, (tgt_total - bonus_sec) // n_items))
-    chars_per_sec = 9.5 / max(0.5, speaking_rate)
-    base_chars = int(ideal * chars_per_sec)
-
-    lens = []
-    drift = int(base_chars * 0.25)
-    for _ in range(n_items):
-        lens.append(max(int(s_min*chars_per_sec), min(int(s_max*chars_per_sec), base_chars + random.randint(-drift, drift))))
-    bonus_chars = int(bonus_sec * chars_per_sec) if bonus_sec>0 else 0
-    return lens, bonus_chars
-
-# --------------------------- OpenAI ラッパ ---------------------------
+# --------- LLM summary ---------
 
 def openai_client():
     from openai import OpenAI
-    api_key = sanitize_openai_key(get_env_strict("OPENAI_API_KEY"))
-    base_url = os.getenv("OPENAI_BASE_URL", None)
-    return OpenAI(api_key=api_key, base_url=base_url, timeout=60, max_retries=1)
+    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def llm_mono(title: str, base_text: str, style: str, target_chars: int, temperature: float) -> str:
+def build_prompt_style(cfg: Dict[str, Any]) -> str:
+    extra_topics = textwrap.dedent("""
+    追加トピックを適宜織り込む（最新海外AIニュース、松尾研究室、落合陽一、プロンプト・マルチエージェント、自律エージェント、論文、ビジネス活用、GitHub活用、深津式プロンプトの学び、簿記3級、経理転職、基本情報技術者、筋トレ）。
+    ただしURL・記号の読み上げは禁止。略語を一文字ずつ読むのも禁止（例：LLMは「エルエルエム」ではなく“エルエルエム”の単語として普通に）。
+    """).strip()
+    return f"{cfg['summary']['style']}\n{extra_topics}"
+
+SYSTEM_PROMPT = """あなたは日本語のオーディオ台本作成アシスタントです。
+出力は以下2部構成：
+(1) 一人語り：導入→ニュースの要点→背景→技術の肝→現実的な活用→オチの一言。カジュアルでテンポよく、比喩を少なく、内容は濃く。
+(2) 二人語り：司会と相棒の短い掛け合い（最大30秒）。相棒は時々ツッコミやユーモア。
+禁止事項：URL、記号列の読み上げ、出典の羅列、長すぎる前置き。
+"""
+
+def summarize_with_openai(items: List[Dict[str, Any]], cfg: Dict[str, Any]) -> List[Dict[str, Any]]:
     client = openai_client()
-    sys = (
-        "あなたは上級のAI技術ジャーナリスト兼ナレーター。"
-        "日本語で一人語りの原稿を作る。URL/生アドレス/長い英数字/コード/逐次スペル読みは出力禁止。"
-        "海外/国内の視点を織り交ぜ、実務に持ち帰れる学びを入れる。"
-    )
-    user = (
-        f"【見出し】{title}\n"
-        f"【参考本文】{base_text}\n"
-        f"【スタイル】\n{style}\n"
-        f"【長さ目安】約{max(600, target_chars)}文字（±20%）"
-    )
-    resp = client.chat.completions.create(
-        model=os.getenv("OPENAI_SUMMARY_MODEL", "gpt-4o-mini"),
-        temperature=float(temperature),
-        messages=[{"role":"system","content":sys},{"role":"user","content":user}],
-    )
-    return clean_for_speech((resp.choices[0].message.content or "").strip())
+    style = build_prompt_style(cfg)
+    out: List[Dict[str, Any]] = []
+    for idx, it in enumerate(items, 1):
+        base = f"タイトル: {it.get('title','')}\n要約: {it.get('summary','')}\n"
+        user = f"{base}\nこの話題について、{style}\n文字数:{cfg['summary']['max_chars_per_item']}字以内で。"
+        # リトライ
+        for attempt in range(3):
+            try:
+                resp = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    temperature=cfg["summary"]["temperature"],
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": user}
+                    ],
+                )
+                text = resp.choices[0].message.content.strip()
+                # URLや余計な括弧の除去
+                text = re.sub(r"https?://\S+", "", text)
+                text = text.replace("()", "")
+                out.append({
+                    "title": it.get("title",""),
+                    "text": text
+                })
+                break
+            except Exception as e:
+                log(f"[WARN] LLM summarize failed {idx} try={attempt+1}: {e}")
+                time.sleep(2 * (attempt + 1))
+        else:
+            # 失敗時フォールバック
+            out.append({
+                "title": it.get("title",""),
+                "text": f"話題「{it.get('title','')}」について：要点、背景、技術、影響を簡潔に紹介します。"
+            })
+    log(f"[INFO] texts_for_tts: {len(out)}")
+    return out
 
-def llm_duo(title: str, base_text: str, style: str, target_chars: int, temperature: float) -> str:
+# --------- TTS ---------
+
+def tts_openai(text: str, voice: str, model: str, speaking_rate: float, bitrate_kbps: int) -> AudioSegment:
+    """
+    OpenAI TTS（非ストリーミング）。接続エラーは数回リトライ。
+    """
+    from openai import APIConnectionError
     client = openai_client()
-    sys = (
-        "あなたは日本語の台本作家。MCとAIエンジニアの2人会話スクリプトを作る。"
-        "会話は自然でテンポ良く、笑いどころ少し。URL/生アドレス/長い英数字/コード/逐次スペル読みは禁止。"
-        "海外/国内、日本の研究・アート文脈も織り込む。"
-    )
-    user = (
-        f"【見出し】{title}\n"
-        f"【参考本文】{base_text}\n"
-        f"【スタイル】\n{style}\n"
-        "【登場人物】MC（聞き手/要約）／AIエンジニア（技術深掘り）\n"
-        "【トーン】砕けた口語、技術濃度高め、ユーモア少々\n"
-        f"【長さ目安】約{max(700, target_chars)}文字（±20%）\n"
-        "【フォーマット】\n"
-        "MC: ……\n"
-        "AI: ……\n"
-        "（以降交互に数往復、最後は短いオチ）"
-    )
-    resp = client.chat.completions.create(
-        model=os.getenv("OPENAI_SUMMARY_MODEL", "gpt-4o-mini"),
-        temperature=float(temperature),
-        messages=[{"role":"system","content":sys},{"role":"user","content":user}],
-    )
-    return clean_for_speech((resp.choices[0].message.content or "").strip())
 
-def llm_lesson(bucket: str, style: str, target_chars: int, temperature: float) -> str:
-    """ニュース不足時に埋める定番レッスン生成"""
-    topics = {
-        "accounting_boki3": "簿記3級の基礎（仕訳→試算表→財務三表のつながり）を、例題と暗記コツ付きで。",
-        "career_accounting": "経理の志望動機・転職の考え方。自分の強みを具体事例で紐づけるフレーム。",
-        "it_fe": "基本情報技術者の頻出論点（アルゴリズム、ネットワーク、セキュリティ）を1分要点で。",
-        "fitness": "筋トレ週3・45分のメニュー設計（プッシュ/プル/レッグ）と栄養5原則。",
-        "ai_global": "海外AIトレンドの俯瞰（モデル動向、推論最適化、エージェント化）と日本企業への示唆。",
-        "ai_jp_art": "松尾研究室や落合陽一の文脈から、研究×表現が与える影響を日常業務に翻訳。"
-    }
-    client = openai_client()
-    sys = (
-        "あなたは日本語の教育コンテンツ作家。実務に役立つ“持ち帰り”を必ず入れる。"
-        "URL/生アドレス/長い英数字/逐次スペル読みは禁止。"
-    )
-    user = (
-        f"【お題】{topics.get(bucket, '今日のAI実務Tips')}\n"
-        f"【スタイル】\n{style}\n"
-        f"【長さ目安】約{max(500, target_chars)}文字（±20%）"
-    )
-    resp = client.chat.completions.create(
-        model=os.getenv("OPENAI_SUMMARY_MODEL", "gpt-4o-mini"),
-        temperature=float(temperature),
-        messages=[{"role":"system","content":sys},{"role":"user","content":user}],
-    )
-    return clean_for_speech((resp.choices[0].message.content or "").strip())
+    # 長文をチャンクに分割
+    chunk_size = 700
+    chunks = []
+    buf = ""
+    for line in text.splitlines():
+        if len(buf) + len(line) + 1 > chunk_size:
+            if buf:
+                chunks.append(buf)
+                buf = ""
+        buf += (line + " ")
+    if buf:
+        chunks.append(buf)
 
-# --------------------------- 記事本文取得 ---------------------------
+    segments: List[AudioSegment] = []
+    for i, ch in enumerate(chunks, 1):
+        for attempt in range(3):
+            try:
+                audio = client.audio.speech.create(
+                    model=model,
+                    voice=voice,
+                    input=ch,
+                    format="mp3",
+                    speed=speaking_rate,
+                )
+                mp3_bytes = audio.content  # SDK v1.44 以降
+                seg = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
+                segments.append(seg)
+                break
+            except APIConnectionError as e:
+                log(f"[WARN] TTS connection error (retry) part={i}: {e}")
+                time.sleep(2 * (attempt + 1))
+            except Exception as e:
+                log(f"[WARN] TTS failed part={i}: {e}")
+                time.sleep(1)
+                break  # 次のチャンクへ（このチャンクは諦める）
 
-def fetch_article_text(url: str) -> str:
-    if not url: return ""
+    if not segments:
+        raise RuntimeError("TTSがすべて失敗しました。APIキーやネットワーク設定を確認してください。")
+
+    out = segments[0]
+    for s in segments[1:]:
+        out += s
+    return out
+
+# --------- Build program ---------
+
+def build_program_from_texts(texts: List[Dict[str, Any]], cfg: Dict[str, Any]) -> AudioSegment:
+    voice = cfg["tts"]["voice"]
+    model = cfg["tts"]["model"]
+    rate = float(cfg["tts"]["speaking_rate"])
+    bitrate_k = int(cfg["tts"]["output_bitrate"])
+
+    intro_text = "通勤AIニュース。今日も技術濃度高めでいきます。"
+    outro_text = "以上、通勤AIニュースでした。良い一日を！"
+
+    program = AudioSegment.silent(duration=300)  # 0.3秒の無音で開始ブツ切れ防止
     try:
-        downloaded = trafilatura.fetch_url(url, no_ssl=True, timeout=20)
-        extracted = trafilatura.extract(downloaded) if downloaded else ""
-        return (extracted or "").strip()
-    except Exception:
-        return ""
+        program += tts_openai(intro_text, voice, model, rate, bitrate_k)
+    except Exception as e:
+        log(f"[WARN] intro TTS failed: {e}")
 
-# --------------------------- TTS ---------------------------
-
-def tts_openai(text: str, voice="alloy", model="gpt-4o-mini-tts", speaking_rate=1.05) -> AudioSegment:
-    from openai import OpenAI
-    api_key = sanitize_openai_key(get_env_strict("OPENAI_API_KEY"))
-    base_url = os.getenv("OPENAI_BASE_URL", None)
-    client = OpenAI(api_key=api_key, base_url=base_url, timeout=60, max_retries=0)
-
-    # まずストリーミング
-    try:
-        with client.audio.speech.with_streaming_response.create(model=model, voice=voice, input=text) as resp:
-            mp3_bytes = resp.read()
-        seg = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
-    except Exception:
-        # 非ストリーミングにフォールバック
-        resp = client.audio.speech.create(model=model, voice=voice, input=text)
-        mp3_bytes = getattr(resp, "content", None) or (resp.read() if hasattr(resp, "read") else None)
-        if not mp3_bytes:
-            raise RuntimeError("TTSレスポンスから音声データを取得できませんでした。")
-        seg = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
-
-    if speaking_rate and speaking_rate != 1.0:
-        seg = seg._spawn(seg.raw_data, overrides={"frame_rate": int(seg.frame_rate * speaking_rate)}).set_frame_rate(seg.frame_rate)
-    return seg.set_frame_rate(44100).set_channels(2)
-
-def synthesize_texts(texts: List[str], voice: str, model: str, rate: float) -> AudioSegment:
-    if not texts: raise RuntimeError("音声化するテキストが0件です。")
-    gap = AudioSegment.silent(duration=700)
-    program = AudioSegment.silent(duration=600)
+    # 本編
+    item_ok = 0
     for i, t in enumerate(texts, 1):
-        print(f"[INFO] TTS {i}/{len(texts)} chars={len(t)}")
-        program += tts_openai(t, voice=voice, model=model, speaking_rate=rate) + gap
-        time.sleep(0.2)
+        try:
+            program += AudioSegment.silent(duration=200)
+            head = f"トピック {i}。{t['title']}。"
+            body = t["text"]
+            seg = tts_openai(head + "\n" + body, voice, model, rate, bitrate_k)
+            program += seg
+            item_ok += 1
+        except Exception as e:
+            log(f"[WARN] item TTS failed {i}: {e}")
+
+    try:
+        program += AudioSegment.silent(duration=200)
+        program += tts_openai(outro_text, voice, model, rate, bitrate_k)
+    except Exception as e:
+        log(f"[WARN] outro TTS failed: {e}")
+
+    # 全滅フォールバック
+    if item_ok == 0:
+        log("[WARN] no items succeeded; building fallback audio")
+        fallback = "今日は技術的な問題で短縮版です。明日はもっと面白く、濃い話をお届けします。"
+        program = tts_openai(fallback, voice, model, rate, bitrate_k)
+
     return program
 
-# --------------------------- フィード出力 ---------------------------
+# --------- RSS ---------
 
-def export_mp3(program: AudioSegment, out_dir: str, filename: str, bitrate_k: int) -> str:
-    os.makedirs(out_dir, exist_ok=True)
-    mp3_path = os.path.join(out_dir, filename)
-    program.export(mp3_path, format="mp3", bitrate=f"{bitrate_k}k")
-    return mp3_path
-
-def write_feed(base_url: str, out_dir: str, items: List[Dict], title: str, author: str):
-    base_url = (base_url or "").strip().rstrip("/")
-    fg = FeedGenerator(); fg.load_extension('podcast')
-    fg.id(f"{base_url}/feed.xml")
-    fg.title(title)
-    fg.link(href=base_url)
-    fg.link(href=f"{base_url}/feed.xml", rel='self')
-    fg.description("通勤向け：AI関連ニュースの音声ダイジェスト（日本語）")
+def build_and_save_podcast(mp3_path: str, out_dir: str, base_url: str, site_title: str, site_author: str, site_desc: str):
+    fg = FeedGenerator()
+    fg.title(site_title)
+    fg.link(href=base_url, rel='alternate')
     fg.language('ja')
-    now = now_utc(); fg.pubDate(now)
+    fg.description(site_desc)
+    now = utcnow()
+    fg.pubDate(now)
+    fg.lastBuildDate(now)
+    fg.generator('python-feedgen')
 
-    for it in items:
-        fe = fg.add_entry()
-        fe.id(it["url"])
-        fe.title(it["title"])
-        fe.enclosure(it["url"], it["length"], 'audio/mpeg')
-        fe.pubDate(now)
-        fe.description(it.get("desc",""))
+    # item
+    title = f"{site_title} {dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).date()}"
+    fe = fg.add_entry()
+    fe.title(title)
+    fe.description("本日の主要AIニュースを、日本語でやさしく要点解説。")
+    rel_mp3 = os.path.basename(mp3_path)
+    mp3_url = f"{base_url.rstrip('/')}/{rel_mp3}"
+    fe.guid(mp3_url, permalink=False)
+    size = os.path.getsize(mp3_path) if os.path.exists(mp3_path) else 0
+    fe.enclosure(mp3_url, str(size), 'audio/mpeg')
+    fe.pubDate(now)
 
+    # write feed
+    ensure_dir(out_dir)
     xml = fg.rss_str(pretty=True)
     with open(os.path.join(out_dir, "feed.xml"), "wb") as f:
         f.write(xml)
 
-# --------------------------- メイン ---------------------------
+# --------- main ---------
 
 def main():
-    cfg = load_config()
-    site = cfg.get("site", {})
-    tts_cfg = cfg.get("tts", {})
-    styles = cfg.get("styles", {})
-    summary_cfg = cfg.get("summary", {})
-    modes = cfg.get("modes", ["mono","duo"])
+    validate_openai_api_key()
 
-    base_url = (os.getenv("FEED_BASE_URL") or site.get("base_url") or "").strip()
+    cfg = read_yaml("config.yaml")
+
+    # base_url決定（優先度：config.yaml > Secrets(FEED_BASE_URL) > 自動推定）
+    base_url = sanitize_base_url(cfg["site"].get("base_url")) or \
+               sanitize_base_url(os.getenv("FEED_BASE_URL")) or \
+               sanitize_base_url(infer_pages_base_url())
     if not base_url:
-        raise RuntimeError("FEED_BASE_URL が未設定です（Secrets）。例: https://seitoshiki.github.io/-ai-commute-audio-")
+        raise RuntimeError("base_url を決定できませんでした。config.yaml か Secrets:FEED_BASE_URL を設定してください。")
+    log(f"[INFO] base_url = {base_url}")
 
-    speaking_rate = float(tts_cfg.get("speaking_rate", 1.05))
-    all_items = fetch_all_items(cfg)
-    filtered = filter_items(all_items, cfg)
-    picked = select_mixed_items(filtered, cfg)
-    print(f"[INFO] picked items: {len(picked)}")
+    # 記事収集→フィルタ→選定
+    items = fetch_items_from_config(cfg)
+    items = filter_items(items, cfg)
+    items = pick_for_duration(items, cfg)
 
-    # 文字数割り当て
-    per_item_chars, bonus_chars = plan_lengths(len(picked), cfg, speaking_rate)
-    temp = float(summary_cfg.get("temperature", 0.45))
+    # LLM要約（技術濃度＆ユーモア）
+    texts = summarize_with_openai(items, cfg)
 
-    # ニュース本文取得
-    articles: List[str] = []
-    for it in picked:
-        txt = fetch_article_text(it.get("link","")) if not it.get("synthetic") else ""
-        if not txt: txt = it.get("summary","")
-        articles.append(clean_for_speech(txt))
+    # 音声合成
+    out_dir = "output"
+    ensure_dir(out_dir)
+    today = dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).strftime("%Y-%m-%d")
+    mp3_name = f"{today}-ai-commute.mp3"
+    mp3_path = os.path.join(out_dir, mp3_name)
 
-    # モードごとに台本生成
-    texts_by_mode: Dict[str, List[str]] = {}
+    program = build_program_from_texts(texts, cfg)
+    # 注意: export時のbitrateはpydubの引数で指定（_thing_）
+    program.export(mp3_path, format="mp3", bitrate=f"{cfg['tts']['output_bitrate']}k")
+    log(f"[INFO] mp3 saved: {mp3_path} size={os.path.getsize(mp3_path)}")
 
-    # オープニング共通
-    opening_mono = "おはようございます。通勤AIニュース、一人語りバージョンです。今日も技術濃度高めで、でも肩の力は抜いて行きましょう。"
-    opening_duo  = "MC: おはようございます、通勤AIニュース対話版！\nAI: 眠気覚ましに推論最適化の小ネタ、持ってきました。"
-
-    closing_mono = "以上、通勤AIニュース（モノローグ）でした。昼休みに1トピック復習、夕方に1アイデア実践、これで記憶が定着します。いってらっしゃい！"
-    closing_duo  = "MC: 以上、対話版でした！\nAI: 今日の一歩がモデルの汎化性能を上げます。それでは、行ってらっしゃい。"
-
-    # 一人語り
-    if "mono" in modes:
-        texts = [opening_mono]
-        for i, it in enumerate(picked):
-            base_text = articles[i]
-            target_chars = per_item_chars[i] if i < len(per_item_chars) else 900
-            if it.get("synthetic"):
-                body = llm_lesson(it["bucket"], styles.get("mono",""), target_chars, temp)
-            else:
-                body = llm_mono(it["title"], base_text, styles.get("mono",""), target_chars, temp)
-            preface = f"— トピック {i+1}：「{it['title']}」"
-            texts.append(preface + "。" + body)
-            time.sleep(0.3)
-
-        if summary_cfg.get("include_bonus_tip"):
-            bonus = llm_lesson("ai_global", styles.get("mono",""), bonus_chars or 600, temp)
-            texts.append("締めの“今日の学び”。" + bonus)
-
-        texts.append(closing_mono)
-        texts_by_mode["mono"] = texts
-
-    # 二人語り
-    if "duo" in modes:
-        texts = [opening_duo]
-        for i, it in enumerate(picked):
-            base_text = articles[i]
-            target_chars = per_item_chars[i] if i < len(per_item_chars) else 1000
-            if it.get("synthetic"):
-                body = llm_lesson(it["bucket"], styles.get("duo",""), target_chars, temp)
-                # レッスンは会話風に軽く前置きを付ける
-                body = f"MC: 次のテーマ「{it['title']}」。\nAI: 了解、要点を会話で手早くいきます。\n" + body
-            else:
-                body = llm_duo(it["title"], base_text, styles.get("duo",""), target_chars, temp)
-            texts.append(body)
-            time.sleep(0.3)
-
-        if summary_cfg.get("include_bonus_tip"):
-            bonus = llm_lesson("ai_jp_art", styles.get("duo",""), bonus_chars or 600, temp)
-            texts.append("MC: 最後に“今日の学び”まとめ。\nAI: " + bonus)
-
-        texts.append(closing_duo)
-        texts_by_mode["duo"] = texts
-
-    # 合成→MP3
-    today = now_utc().date().isoformat()
-    out_dir = os.path.join("output", today)
-    os.makedirs(out_dir, exist_ok=True)
-
-    mp3_items_for_feed = []
-    for mode, texts in texts_by_mode.items():
-        program = synthesize_texts(
-            texts,
-            voice=tts_cfg.get("voice","alloy"),
-            model=tts_cfg.get("model","gpt-4o-mini-tts"),
-            rate=speaking_rate,
-        )
-        fname = f"{today}-ai-commute-{mode}.mp3"
-        path = export_mp3(program, out_dir, fname, int(tts_cfg.get("output_bitrate",128)))
-        rel_url = f"{today}/{fname}"
-        enclosure_url = f"{base_url.rstrip('/')}/{rel_url}"
-        length = os.path.getsize(path) if os.path.exists(path) else 0
-        title = f"{site.get('title','通勤AIニュース')} {today} [{ '一人語り' if mode=='mono' else '二人語り' }]"
-        desc = "本日のダイジェスト（海外/国内/アート×AI＋実務の学び）。"
-        mp3_items_for_feed.append({"url": enclosure_url, "title": title, "length": length, "desc": desc})
-
-    # RSS 書き出し（同日に2アイテム）
-    write_feed(base_url, out_dir, mp3_items_for_feed, site.get("title","通勤AIニュース"), site.get("author","あなた"))
+    # RSS生成
+    build_and_save_podcast(
+        mp3_path=mp3_path,
+        out_dir=out_dir,
+        base_url=base_url,
+        site_title=cfg["site"]["title"],
+        site_author=cfg["site"]["author"],
+        site_desc=cfg["site"].get("description","通勤向け：AI関連ニュースの音声ダイジェスト（日本語）"),
+    )
+    log("[INFO] feed.xml generated")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        log("[ERROR] " + str(e))
+        traceback.print_exc()
+        sys.exit(1)
