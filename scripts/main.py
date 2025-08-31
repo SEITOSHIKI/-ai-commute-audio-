@@ -244,5 +244,11 @@ def main():
         except Exception:
             pass
 
+print(f"[INFO] fetched items: {len(items)}")
+print(f"[INFO] picked items: {len(picked)}")
+...
+print(f"[INFO] texts_for_tts: {len(texts_for_tts)}")
+
+
 if __name__ == "__main__":
     main()
