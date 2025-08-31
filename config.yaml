@@ -2,7 +2,6 @@ site:
   title: "通勤AIニュース"
   author: "SEITOSHIKI"
   language: "ja"
-  # FEED_BASE_URL が未設定のとき scripts/main.py が自動推定（GitHub PagesのURL）します
   base_url: null
   description: "通勤向け：AI関連ニュースの音声ダイジェスト（日本語）"
 
@@ -37,7 +36,7 @@ filters:
     - "求人"
 
 summary:
-  style: "友達に話す口調で、要点→背景→技術→影響→一言の順。略語は“単語をそのまま”読み、URLは絶対に発話しない。"
+  style: "友達に話す口調で、要点→背景→技術→影響→一言の順。URLと記号の読み上げは禁止。略語は単語として自然に読む。"
   max_chars_per_item: 900
   temperature: 0.35
   include_source: false
@@ -52,3 +51,4 @@ tts:
 
 output:
   keep_days: 14
+
