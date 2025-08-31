@@ -1,8 +1,60 @@
-openai>=1.35.10,<2
-httpx>=0.27.0
-feedgen>=0.9.0
-pydub>=0.25.1
-trafilatura>=1.7.0
-feedparser>=6.0.11
-python-dateutil>=2.8.2
-pyyaml>=6.0.2
+name: Build & Publish AI Commute Audio
+
+on:
+  workflow_dispatch:
+  schedule:
+    # JST 05:00 は UTC 20:00（前日）
+    - cron: "0 20 * * *"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Generate audio & feed
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }} # 使わないなら未設定でOK
+          FEED_BASE_URL: ${{ secrets.FEED_BASE_URL }}
+          OPENAI_SUMMARY_MODEL: gpt-4o-mini
+        run: |
+          python -m scripts.main
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./output
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
