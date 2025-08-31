@@ -38,7 +38,7 @@ summary:
 
 tts:
   provider: "openai"
-  model: "gpt-4o-mini-tts"
+  model: "tts-1"
   voice: "alloy"
   speaking_rate: 1.05
   chunk_chars: 800
