@@ -1,0 +1,44 @@
+name: Build & Publish AI Commute Audio
+
+on:
+  schedule:
+    - cron: "15 21 * * *"   # JST 06:15 相当（UTC基準）
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate audio & feed
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          FEED_BASE_URL: ${{ secrets.FEED_BASE_URL }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python -m scripts.main
+          ls -l output
+
+      - name: Upload to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: output
+          keep_files: true
