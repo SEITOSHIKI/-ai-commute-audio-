@@ -3,7 +3,7 @@ name: Build & Publish AI Commute Audio
 on:
   workflow_dispatch:
   schedule:
-    # JST 05:00 = UTC 20:00 (前日)
+    # JST 05:00 = UTC 20:00（前日）
     - cron: "0 20 * * *"
 
 permissions:
@@ -17,8 +17,6 @@ concurrency:
 
 env:
   PYTHONUNBUFFERED: "1"
-  # 任意：FEED_BASE_URL を Secrets に入れていない場合、自動で推定します（scripts/main.py側で判定）
-  # FEED_BASE_URL: https://<yourname>.github.io/<repo>
 
 jobs:
   build:
@@ -37,10 +35,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Install ffmpeg
+      - name: Install ffmpeg & espeak
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg espeak-ng
 
       - name: Generate audio & feed
         env:
