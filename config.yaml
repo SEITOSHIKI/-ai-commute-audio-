@@ -2,12 +2,13 @@ site:
   title: "通勤AIニュース"
   author: "あなたの名前"
   language: "ja"
+  # GitHub Actions の Secret に FEED_BASE_URL を入れているなら空でOK
   base_url: null
 
 schedule:
-  target_total_minutes: 60
-  per_item_seconds_min: 90
-  per_item_seconds_max: 360
+  target_total_minutes: 60        # 全体尺の目安（分）
+  per_item_seconds_min: 120       # 1トピック最短（秒）…情報濃度に応じて要調整
+  per_item_seconds_max: 360       # 1トピック最長（秒）
   max_items: 18
 
 sources:
@@ -31,17 +32,26 @@ filters:
     - "求人"
 
 summary:
-  style: "友達に話す口調で、要点→背景→影響→一言コメントの順。固有名詞は日本語カタカナ併記。"
-  max_chars_per_item: 900
-  temperature: 0.3
-  include_source: true
+  # ここは LLM への要望。二人会話にしない・URL読まない・羅列しない等を強制！
+  style: |
+    一人称のナレーターが落ち着いた口調で、ユーモア少々、分かりやすく語る。
+    構成は「導入→背景→目的→技術の仕組み→検証・評価→業務活用アイデア（具体例）→学びの要点→ひと言」で、
+    個々の固有名詞はカタカナ併記しつつ、アルファベットの逐次スペル読みは絶対にしない。
+    URLや生のアドレス・コード・長い英数字列は読み上げない（自然な日本語に換言）。
+    プロンプトエンジニアリング、オーケストレーション、マルチエージェント、自律型AIエージェント、論文の示唆、
+    GitHubでのAI活用、深津プロンプトの示唆など、学びを毎回1つ以上含める。
+    NOTEBOOK LLMのような二人会話形式は禁止。ナレーター一人で語る。
+  # LLM が狙う文字量（秒→文字換算）をスクリプト側で自動計算します
+  temperature: 0.4
+  include_bonus_tip: true        # 最後に「今日の学び」1本を追加
+  bonus_tip_seconds: 120         # ボーナス尺の目安
 
 tts:
   provider: "openai"
-  model: "tts-1"
+  model: "gpt-4o-mini-tts"
   voice: "alloy"
   speaking_rate: 1.05
-  chunk_chars: 800
+  chunk_chars: 1000
   output_bitrate: 128
 
 output:
