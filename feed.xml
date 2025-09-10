@@ -7,14 +7,14 @@
     <docs>http://www.rssboard.org/rss-specification</docs>
     <generator>python-feedgen</generator>
     <language>ja</language>
-    <lastBuildDate>Tue, 09 Sep 2025 20:37:58 +0000</lastBuildDate>
-    <pubDate>Tue, 09 Sep 2025 20:37:58 +0000</pubDate>
+    <lastBuildDate>Wed, 10 Sep 2025 20:36:14 +0000</lastBuildDate>
+    <pubDate>Wed, 10 Sep 2025 20:36:14 +0000</pubDate>
     <item>
-      <title>通勤AIニュース 2025-09-10</title>
+      <title>通勤AIニュース 2025-09-11</title>
       <description>本日の主要AIニュースを、日本語でやさしく要点解説。</description>
-      <guid isPermaLink="false">https://seitoshiki.github.io/-ai-commute-audio-/2025-09-10-ai-commute.mp3</guid>
-      <enclosure url="https://seitoshiki.github.io/-ai-commute-audio-/2025-09-10-ai-commute.mp3" length="41503808" type="audio/mpeg"/>
-      <pubDate>Tue, 09 Sep 2025 20:37:58 +0000</pubDate>
+      <guid isPermaLink="false">https://seitoshiki.github.io/-ai-commute-audio-/2025-09-11-ai-commute.mp3</guid>
+      <enclosure url="https://seitoshiki.github.io/-ai-commute-audio-/2025-09-11-ai-commute.mp3" length="42893523" type="audio/mpeg"/>
+      <pubDate>Wed, 10 Sep 2025 20:36:14 +0000</pubDate>
     </item>
   </channel>
 </rss>
