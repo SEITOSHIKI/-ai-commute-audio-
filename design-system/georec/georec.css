@@ -1,0 +1,76 @@
+/* GEOREC components — static HTML/CSS renditions of the deck's slide parts.
+   Every value comes from tokens.css. Grayscale only; no radius, no shadow. */
+.gr-root { font-family: var(--font-sans); color: var(--ink); background: var(--paper); font-variant-numeric: tabular-nums; }
+.gr-root *, .gr-root *::before, .gr-root *::after { box-sizing: border-box; }
+
+/* SlideFrame */
+.gr-slide { position: relative; width: var(--slide-width); height: var(--slide-height); background: var(--paper); color: var(--ink); overflow: hidden; outline: var(--stroke-rule) solid var(--rule); }
+.gr-slide__body { position: absolute; inset: var(--space-6) var(--space-8) calc(var(--space-6) + var(--space-4)) var(--space-8); display: flex; flex-direction: column; gap: var(--space-3); }
+.gr-slide__mark { position: absolute; top: var(--space-3); right: var(--space-4); width: var(--corner-mark); color: var(--ink); }
+.gr-slide__mark svg { display: block; width: 100%; height: auto; }
+.gr-slide__foot { position: absolute; right: var(--space-4); bottom: var(--space-2); display: flex; gap: var(--space-4); color: var(--gray-500); }
+
+/* SlideHeading */
+.gr-heading { display: flex; flex-direction: column; gap: var(--space-1); padding-right: var(--space-8); }
+.gr-heading h1, .gr-heading p { margin: 0; }
+.gr-heading p { color: var(--gray-700); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* BlackBand */
+.gr-band { background: var(--ink); color: var(--on-ink); display: flex; align-items: center; gap: var(--space-6); padding: var(--space-4) var(--space-6); }
+.gr-band svg { display: block; flex: none; }
+.gr-band p { margin: 0; }
+
+/* DataTable */
+.gr-table { border-collapse: collapse; width: 100%; }
+.gr-table th, .gr-table td { padding: var(--space-1) var(--space-2); border-bottom: var(--stroke-rule) solid var(--rule); text-align: right; white-space: nowrap; }
+.gr-table th:first-child, .gr-table td:first-child { text-align: left; }
+.gr-table thead th { background: var(--fill); border-bottom: var(--stroke-strong) solid var(--ink); }
+.gr-table .gr-table__basis { text-align: left; color: var(--gray-700); white-space: normal; }
+.gr-table tr.is-total td { border-top: var(--stroke-strong) solid var(--ink); font-weight: 700; }
+
+/* StatCard */
+.gr-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+.gr-stat { border: var(--stroke-rule) solid var(--rule); padding: var(--space-2) var(--space-3); display: flex; flex-direction: column; gap: var(--space-1); }
+.gr-stat p { margin: 0; }
+.gr-stat__src { color: var(--gray-700); }
+
+/* ModuleCard */
+.gr-modules { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-3); }
+.gr-module { background: var(--fill); padding: var(--space-2) var(--space-3); display: grid; grid-template-columns: auto 1fr; column-gap: var(--space-2); row-gap: var(--space-1); }
+.gr-module h3 { margin: 0; grid-column: 1 / -1; }
+.gr-module h3 small { font-weight: 400; color: var(--gray-700); margin-left: var(--space-2); }
+.gr-module dt { color: var(--gray-700); }
+.gr-module dd { margin: 0; }
+
+/* PriceStrip */
+.gr-strip { background: var(--fill); border-top: var(--stroke-strong) solid var(--ink); padding: var(--space-2) var(--space-3); margin: 0; }
+.gr-strip b { font-weight: 700; }
+
+/* LabelRow (SWOT) */
+.gr-labels { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.gr-labels li { display: flex; align-items: baseline; gap: var(--space-2); }
+.gr-label { flex: none; width: 1.8em; text-align: center; background: var(--ink); color: var(--on-ink); }
+
+/* StageColumn */
+.gr-stages { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3); }
+.gr-stage { display: flex; flex-direction: column; border: var(--stroke-rule) solid var(--rule); }
+.gr-stage h3 { margin: 0; background: var(--ink); color: var(--on-ink); padding: var(--space-1) var(--space-2); }
+.gr-stage ul { margin: 0; padding: var(--space-2); list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.gr-stage li b { display: block; }
+
+/* ClosingBox */
+.gr-closing { background: var(--ink); color: var(--on-ink); padding: var(--space-3) var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); }
+.gr-closing p { margin: 0; }
+
+/* TitlePanel (表紙) */
+.gr-title { display: grid; grid-template-columns: 1fr 2fr; height: 100%; }
+.gr-title__left { background: var(--ink); color: var(--on-ink); padding: var(--space-8) var(--space-6); display: flex; flex-direction: column; justify-content: center; gap: var(--space-4); }
+.gr-title__left p { margin: 0; }
+.gr-title__right { padding: var(--space-6) var(--space-8) var(--space-6) var(--space-6); display: flex; flex-direction: column; gap: var(--space-2); }
+.gr-title__right h1, .gr-title__right p { margin: 0; }
+.gr-summary { margin: 0; padding: 0; list-style: none; }
+.gr-summary li { border-top: var(--stroke-rule) solid var(--rule); padding: var(--space-1) 0; }
+.gr-summary li:last-child { border-bottom: var(--stroke-rule) solid var(--rule); }
+
+/* Note */
+.gr-note { margin: 0; color: var(--gray-700); }

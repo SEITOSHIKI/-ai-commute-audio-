@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 116" width="120" height="116" role="img" aria-label="GEOREC">
+  <rect x="4" y="30" width="112" height="6" fill="#1A1A1A"/>
+  <rect x="4" y="36" width="5" height="8" fill="#1A1A1A"/>
+  <rect x="111" y="36" width="5" height="8" fill="#1A1A1A"/>
+  <circle cx="60" cy="76" r="33" fill="none" stroke="#1A1A1A" stroke-width="6"/>
+  <circle cx="60" cy="76" r="20" fill="none" stroke="#1A1A1A" stroke-width="5"/>
+  <circle cx="60" cy="76" r="9" fill="#1A1A1A"/>
+</svg>

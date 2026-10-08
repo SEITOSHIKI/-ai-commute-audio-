@@ -1,0 +1,22 @@
+<!-- @dsCard group="Data" height=300 subtitle="算出根拠列つき 5年収支" -->
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><title>DataTable</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap">
+<style>html,body{margin:0;background:var(--paper)} body{padding:16px} </style>
+</head>
+<body class="gr-root">
+<table class="gr-table table">
+  <thead><tr><th>単位：百万円</th><th>1年目</th><th>2年目</th><th>3年目</th><th>4年目</th><th>5年目</th><th class="gr-table__basis">算出根拠</th></tr></thead>
+  <tbody>
+    <tr><td>累計顧客数（社）</td><td>3</td><td>12</td><td>30</td><td>55</td><td>85</td><td class="gr-table__basis">新規獲得−解約の累計</td></tr>
+    <tr><td>売上高</td><td>12</td><td>48</td><td>110</td><td>190</td><td>290</td><td class="gr-table__basis">ライセンス＋導入支援＋受託</td></tr>
+    <tr><td>売上総利益</td><td>5</td><td>29</td><td>73</td><td>135</td><td>213</td><td class="gr-table__basis">ライセンス85%・支援受託40%</td></tr>
+    <tr><td>販管費</td><td>37</td><td>56</td><td>79</td><td>107</td><td>144</td><td class="gr-table__basis">人件費800万×人数−原価振替＋経費</td></tr>
+    <tr class="is-total"><td>営業利益</td><td>▲32</td><td>▲27</td><td>▲6</td><td>28</td><td>69</td><td class="gr-table__basis">売上総利益−販管費</td></tr>
+    <tr><td>営業利益率</td><td>─</td><td>─</td><td>─</td><td>15%</td><td>24%</td><td class="gr-table__basis">営業利益÷売上高</td></tr>
+    <tr><td>社員数（名）</td><td>4</td><td>7</td><td>11</td><td>15</td><td>20</td><td class="gr-table__basis">導入担当1名あたり年6社から逆算</td></tr>
+  </tbody>
+</table>
+</body>
+</html>

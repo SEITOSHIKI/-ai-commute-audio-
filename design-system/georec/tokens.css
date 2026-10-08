@@ -1,0 +1,40 @@
+/* GEOREC — generated from tokens.json */
+:root, [data-theme="print"] {
+  --ink: #1a1a1a;
+  --gray-700: #4d4d4d;
+  --gray-500: #8c8c8c;
+  --rule: #bfbfbf;
+  --fill: #f2f2f2;
+  --paper: #ffffff;
+  --on-ink: var(--paper);
+}
+:root {
+  --space-1: 4.8px;
+  --space-2: 9.6px;
+  --space-3: 14.4px;
+  --space-4: 19.2px;
+  --space-6: 28.8px;
+  --space-8: 38.4px;
+  --radius-0: 0;
+  --radius-full: 50%;
+  --stroke-rule: 1px;
+  --stroke-strong: 2px;
+  --slide-width: 960px;
+  --slide-height: 540px;
+  --corner-mark: 24px;
+  --font-sans: Meiryo, "メイリオ", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "IPAGothic", sans-serif;
+  --font-latin: Arial, Helvetica, sans-serif;
+}
+.tagline-display { font-family: var(--font-sans); font-size: 48px; line-height: 1.3; font-weight: 700; letter-spacing: 0.04em; }
+.cover-title { font-family: var(--font-sans); font-size: 32px; line-height: 1.35; font-weight: 700; }
+.slide-title { font-family: var(--font-sans); font-size: 26.67px; line-height: 1.3; font-weight: 700; }
+.lead { font-family: var(--font-sans); font-size: 16px; line-height: 1.5; font-weight: 400; }
+.body { font-family: var(--font-sans); font-size: 18.67px; line-height: 1.5; font-weight: 400; }
+.body-strong { font-family: var(--font-sans); font-size: 18.67px; line-height: 1.5; font-weight: 700; }
+.figure { font-family: var(--font-sans); font-size: 37.33px; line-height: 1.15; font-weight: 700; }
+.table { font-family: var(--font-sans); font-size: 12.67px; line-height: 1.4; font-weight: 400; }
+.table-strong { font-family: var(--font-sans); font-size: 12.67px; line-height: 1.4; font-weight: 700; }
+.footer { font-family: var(--font-sans); font-size: 11.33px; line-height: 1.2; font-weight: 400; }
+.note { font-family: var(--font-sans); font-size: 10.67px; line-height: 1.4; font-weight: 400; }
+.wordmark { font-family: var(--font-latin); font-size: 56px; line-height: 1; font-weight: 700; letter-spacing: 7px; }
+.wordmark-sub { font-family: var(--font-latin); font-size: 16px; line-height: 1; font-weight: 400; letter-spacing: 0.6px; }

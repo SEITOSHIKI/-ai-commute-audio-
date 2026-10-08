@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 470 116" width="470" height="116" role="img" aria-label="GEOREC UNDERGROUND ASSET RECORDS">
+  <rect x="4" y="30" width="112" height="6" fill="#1A1A1A"/>
+  <rect x="4" y="36" width="5" height="8" fill="#1A1A1A"/>
+  <rect x="111" y="36" width="5" height="8" fill="#1A1A1A"/>
+  <circle cx="60" cy="76" r="33" fill="none" stroke="#1A1A1A" stroke-width="6"/>
+  <circle cx="60" cy="76" r="20" fill="none" stroke="#1A1A1A" stroke-width="5"/>
+  <circle cx="60" cy="76" r="9" fill="#1A1A1A"/>
+  <text x="146" y="80" fill="#1A1A1A" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="700" letter-spacing="7">GEOREC</text>
+  <text x="148" y="106" fill="#1A1A1A" font-family="Arial, Helvetica, sans-serif" font-size="16" letter-spacing="0.6">UNDERGROUND ASSET RECORDS</text>
+</svg>
