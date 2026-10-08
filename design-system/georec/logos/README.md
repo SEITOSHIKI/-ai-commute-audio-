@@ -12,3 +12,12 @@
 - 幾何は SKILL.md §6 の仕様値（地表線 x4 y30 w112 h6、杭 w5 h8、円 cx60 cy76 r33/20/9、線幅 6/5）。杭は地表線の両端から下向きに置いた。
 - ワードマークの文字はテキスト要素（Arial / Helvetica）。PowerPoint に貼る場合は PNG に書き出して使う。
 - 4-up 印刷でつぶれないよう、マークは幅 24px（0.25in）未満にしない。
+
+## GEN³ Works（三現ワークス）
+
+社名変更に伴うロゴ。同心円3重（外・中は線、中心は塗り）を、三現（現場・現物・現実）として地表線なしで使う。
+
+| ファイル | 用途 |
+|---|---|
+| `gen3-mark-black.svg` / `gen3-mark-white.svg` | 全ページ右上のマーク／黒ベタ上のマーク |
+| `gen3-wordmark-black.svg` / `gen3-wordmark-white.svg` | マーク＋「GEN³ WORKS」＋「GENBA · GENBUTSU · GENJITSU」 |
