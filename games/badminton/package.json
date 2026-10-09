@@ -1,0 +1,19 @@
+{
+  "name": "rally-iq",
+  "version": "1.0.0",
+  "private": true,
+  "description": "バドミントン・シングルスの配球を、シャトルが届くまでに即決する判断トレーニング対戦ゲーム。",
+  "scripts": {
+    "build": "node scripts/build-web.mjs --out dist",
+    "sim": "node sim-test.js",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/core": "8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.2"
+  }
+}

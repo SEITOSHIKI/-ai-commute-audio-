@@ -48,6 +48,16 @@ jobs:
         run: |
           python -m scripts.main
 
+      # ラリーIQ（Web 版）を /rally-iq/ に同梱。失敗しても音声配信は止めない
+      - name: Set up Node (Rally IQ)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build Rally IQ web
+        continue-on-error: true
+        run: node games/badminton/scripts/build-web.mjs --out output/rally-iq
+
       # GitHub Pages を「ブランチ配信」にする想定
       - name: Publish to gh-pages branch
         uses: peaceiris/actions-gh-pages@v3

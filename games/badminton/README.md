@@ -6,9 +6,12 @@
 
 `index.html` をブラウザで開くだけ（ビルド不要・外部依存なし）。
 
+家族への共有（Web 版・APK）と Google Play 公開の手順は [PUBLISHING.md](PUBLISHING.md) を参照。
+
 ```bash
-# Docker で配信する場合の例
-docker run --rm -p 8080:80 -v "$PWD/games/badminton:/usr/share/nginx/html:ro" nginx:alpine
+# Docker で配信する場合の例（配布用ビルドを作ってから配信）
+node games/badminton/scripts/build-web.mjs --out games/badminton/dist
+docker run --rm -p 8080:80 -v "$PWD/games/badminton/dist:/usr/share/nginx/html:ro" nginx:alpine
 # → http://localhost:8080
 ```
 
@@ -38,6 +41,10 @@ docker run --rm -p 8080:80 -v "$PWD/games/badminton:/usr/share/nginx/html:ro" ng
 
 ## ファイル
 
+- `scripts/build-web.mjs` — 配布用 Web 一式を `dist/` に生成（`npm run build`。フォント同梱・PWA 対応）
+- `android/` — Capacitor の Android プロジェクト（`npm run android:sync` で `dist/` を反映）
+- `privacy.html` — プライバシーポリシー（Play ストア申請用）
+- `store/` — Play ストアの掲載文・アイコン・スクリーンショット
 - `engine.js` — 配球シミュレーション（DOM 非依存。Node からも読める）
 - `index.html` — 描画・入力・スコア
 - `sim-test.js` — CPU 同士で数百試合回してバランスを確認: `node games/badminton/sim-test.js`（`diag` 引数でショット別 margin 分布）

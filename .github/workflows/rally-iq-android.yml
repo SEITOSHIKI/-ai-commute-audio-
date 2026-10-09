@@ -1,0 +1,120 @@
+name: Rally IQ Android
+
+# games/badminton（ラリーIQ）の Android アプリをビルドする。
+# - push / 手動実行: APK と AAB を Actions の成果物に保存
+# - タグ rally-iq-v* : さらに GitHub Release を作り、家族向けに APK を添付
+# 署名用シークレットが未設定なら debug 署名の APK だけを作る（Play には出せないが動作確認用）。
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "games/badminton/**"
+      - ".github/workflows/rally-iq-android.yml"
+    tags:
+      - "rally-iq-v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rally-iq-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # main への push で Web 版を gh-pages の /rally-iq/ に即時反映（音声フィードのファイルは残す）。
+  # 毎朝の build.yml も同じものを /rally-iq/ に作り直すので、上書きされても消えない。
+  web:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: "ai-commute-audio"
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node games/badminton/scripts/build-web.mjs --out site/rally-iq
+      - uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          keep_files: true
+
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: games/badminton
+    env:
+      HAS_KEYSTORE: ${{ secrets.RALLYIQ_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: games/badminton/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install
+        run: npm ci
+
+      - name: Balance check (CPU vs CPU)
+        run: node sim-test.js | head -1
+
+      - name: Build web and sync to Android
+        run: |
+          npm run build
+          npx cap sync android
+
+      - name: Decode upload keystore
+        if: env.HAS_KEYSTORE == 'true'
+        run: echo "${{ secrets.RALLYIQ_KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/upload.jks"
+
+      - name: Build signed release (APK + AAB)
+        if: env.HAS_KEYSTORE == 'true'
+        working-directory: games/badminton/android
+        env:
+          RALLYIQ_KEYSTORE_PATH: ${{ runner.temp }}/upload.jks
+          RALLYIQ_KEYSTORE_PASSWORD: ${{ secrets.RALLYIQ_KEYSTORE_PASSWORD }}
+          RALLYIQ_KEY_ALIAS: ${{ secrets.RALLYIQ_KEY_ALIAS }}
+          RALLYIQ_KEY_PASSWORD: ${{ secrets.RALLYIQ_KEY_PASSWORD }}
+        run: |
+          VERSION_NAME=$(node -p "require('../package.json').version")
+          ./gradlew --no-daemon assembleRelease bundleRelease \
+            -PversionCode=${{ github.run_number }} -PversionName="$VERSION_NAME"
+          mkdir -p ../out
+          cp app/build/outputs/apk/release/app-release.apk "../out/rally-iq-$VERSION_NAME.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "../out/rally-iq-$VERSION_NAME.aab"
+
+      - name: Build debug APK (no keystore configured)
+        if: env.HAS_KEYSTORE != 'true'
+        working-directory: games/badminton/android
+        run: |
+          VERSION_NAME=$(node -p "require('../package.json').version")
+          ./gradlew --no-daemon assembleDebug \
+            -PversionCode=${{ github.run_number }} -PversionName="$VERSION_NAME"
+          mkdir -p ../out
+          cp app/build/outputs/apk/debug/app-debug.apk "../out/rally-iq-$VERSION_NAME-debug.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rally-iq-android-${{ github.run_number }}
+          path: games/badminton/out/*
+          if-no-files-found: error
+
+      - name: Publish GitHub Release (tag only)
+        if: startsWith(github.ref, 'refs/tags/rally-iq-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" out/*.apk \
+            --title "ラリーIQ ${GITHUB_REF_NAME#rally-iq-v}" \
+            --notes "Android 端末にインストールできる APK です。ブラウザで遊ぶ場合は Web 版をご利用ください。"

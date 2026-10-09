@@ -1,0 +1,17 @@
+{
+  "appId": "io.github.seitoshiki.rallyiq",
+  "appName": "ラリーIQ",
+  "webDir": "dist",
+  "backgroundColor": "#0d1719",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "cover",
+      "style": "DARK"
+    }
+  }
+}
