@@ -40,7 +40,10 @@ function hline(slide, x, y, w, c, lw) {
 }
 const run = (text, o = {}) => ({ text, options: { fontFace: F, ...o } });
 
+const ACC = "B8692E"; // copper: the conductor of a cable; the one accent of the pitch deck
 function heading(slide, title, lead) {
+  const m = /^([①②③④⑤⑥⑦])\s*(.*)$/.exec(title);
+  if (m) title = [run(m[1] + " ", { color: ACC }), run(m[2])];
   txt(slide, title, { x: X0, y: 0.28, w: 8.7, h: 0.42, size: S.slideTitle, bold: true, valign: "middle", name: "title" });
   if (lead) txt(slide, lead, { x: X0, y: 0.72, w: 8.7, h: 0.28, size: S.lead, color: K.gray700, valign: "middle", name: "lead" });
 }
@@ -94,11 +97,11 @@ const NOTE_PARTS = {
   6: ["3:15 - 3:50", "「貯める」会社は現れた。当社は「渡す」で分かれる",
     "競合です。記録を貯める会社は、東大発のAirion、キャディのCADDiなど、すでにあります。正直に言えば、貯めるところは同じ設計です。分かれるのは渡し方と対象です。連続工程の現場で、現物に重ねて渡し、教材にまでする会社はまだありません。最大の脅威はCADDiですが、図面に現れない現場の処置は、当社にしか貯まりません。"],
   7: ["3:50 - 4:30", "狙う市場は約100億円。周辺市場は年7〜9%で伸びている",
-    "市場規模です。土台となる国内のスマートファクトリー市場は、2025年の42億ドルから年9%で伸びる見込みです。建設テック市場も2030年度に3,000億円を超えます。当社が狙うのは、電線・ケーブル工場の353事業所と、中堅以上の電気工事会社約3,000社。年300万円をかけると約100億円の市場です。5年目に85拠点、シェア2.5%を取りに行きます。"],
+    "市場規模です。土台となる国内のスマートファクトリー市場は、2025年の42億ドルから年9%で伸びる見込みです。建設テック市場も、建築分野だけで2030年度に約3,040億円、年7.4%の成長です。当社が狙うのは、電線・ケーブル工場の353事業所と、中堅以上の電気工事会社約3,000社。年300万円をかけると約100億円の市場です。5年目に85拠点、シェア2.5%を取りに行きます。"],
   8: ["4:30 - 5:15", "1拠点の生涯粗利は約1,865万円、獲得コストは約64万円",
     "お金の流れです。お客様は1拠点あたり年300万円、初年度だけ導入支援200万円を払います。お客様は約2.1か月で元が取れます。1拠点が生む生涯の粗利、LTVは、年255万円を保守的に7年分と、導入支援の粗利を足して約1,865万円。一方、1拠点を獲得する費用、CACは、5年目の営業人件費と広告費を新規拠点数で割って約64万円です。獲得費用は3か月で回収できます。"],
   9: ["5:15 - 5:55", "売上は拠点数×月25万円で積み上がる。5年目は月2,400万円",
-    "売上と費用です。売上は、拠点数かける月25万円の利用料が積み上がる形です。5年目の月次売上は約2,400万円で、内訳は利用料が約1,790万円、導入支援が約550万円です。費用の中心は人件費で、1人あたり年800万円。家賃は1年目月20万円、5年目月50万円、広告と展示会は1年目200万円から5年目500万円を見込んでいます。"],
+    "売上と費用です。売上は、拠点数かける月25万円の利用料が積み上がる形です。5年目の月次売上は約2,400万円で、内訳は利用料が約1,790万円、導入支援が約550万円です。費用の中心は人件費で、1人あたり年800万円。所在地は川崎市を考えています。京浜の工場地帯と羽田・新幹線に近く、関東の電線工場と東京の電気工事会社の両方に出やすい場所です。家賃は1年目15坪で月20万円、5年目40坪で月50万円、広告と展示会は1年目200万円から5年目500万円を見込んでいます。"],
   10: ["5:55 - 6:25", "4年目に損益分岐点を超え、5年目の安全余裕率は32%",
     "損益分岐点です。販管費を粗利率で割った損益分岐点売上は、4年目で1億5,100万円。売上1億9,000万円がこれを初めて上回ります。5年目は分岐点1億9,600万円に対して売上2億9,000万円で、安全余裕率は32%です。"],
   11: ["6:25 - 7:00", "黒字倒産しない。最低残高は固定費3か月分",
@@ -125,24 +128,26 @@ async function main() {
 
   const markBlack = await logo("gen3-mark-black");
   const markWhite = await logo("gen3-mark-white");
-  const wordWhite = await logo("gen3-wordmark-white");
+  const wordWhite = await logo("gen3-logotype-reverse");
+  const logoColor = await logo("gen3-logotype-color");
 
   pres.defineSlideMaster({
     title: "GR_CONTENT",
     background: { color: K.paper },
     objects: [
-      { image: { x: 9.42, y: 0.22, w: 0.3, h: 0.3, data: markBlack } },
-      { text: { text: TAGLINE, options: { x: 6.3, y: 5.3, w: 2.9, h: 0.22, fontFace: F, fontSize: S.footer, color: K.gray500, align: "right", margin: 0, valign: "middle" } } },
+      { image: { x: 8.15, y: 5.2, w: 1.45, h: 1.45 * 120 / 560, data: logoColor } },
+      { text: { text: TAGLINE, options: { x: 0.8, y: 5.29, w: 3.5, h: 0.22, fontFace: F, fontSize: S.footer, color: K.gray500, align: "left", margin: 0, valign: "middle" } } },
     ],
-    slideNumber: { x: 9.3, y: 5.3, w: 0.4, h: 0.22, fontFace: F, fontSize: S.footer, color: K.gray500, align: "right", margin: 0 },
+    slideNumber: { x: 0.4, y: 5.29, w: 0.35, h: 0.22, fontFace: F, fontSize: S.footer, color: K.gray500, align: "left", margin: 0 },
   });
-  const add = (n) => { const s = pres.addSlide({ masterName: "GR_CONTENT" }); s.addNotes(NOTES[n]); return s; };
+  pres.defineSlideMaster({ title: "GR_COVER", background: { color: K.paper }, objects: [{ image: { x: 8.15, y: 5.2, w: 1.45, h: 1.45 * 120 / 560, data: logoColor } }] });
+  const add = (n) => { const s = pres.addSlide({ masterName: n === 1 ? "GR_COVER" : "GR_CONTENT" }); s.addNotes(NOTES[n]); return s; };
 
   // ---------- Slide 1 表紙・希望金額 ----------
   {
     const s = add(1);
     box(s, { x: 0, y: 0, w: 3.6, h: 5.625, fill: K.ink, name: "cover-panel" });
-    s.addImage({ data: wordWhite, x: 0.35, y: 1.1, w: 2.9, h: 0.7 });
+    s.addImage({ data: wordWhite, x: 0.35, y: 1.05, w: 3.0, h: 3.0 * 120 / 560 });
     txt(s, "現場の勘を、\n次の担い手へ。", { x: 0.4, y: 2.15, w: 3.0, h: 0.85, size: 20, bold: true, color: K.paper, lsm: 1.2 });
     txt(s, "株式会社三現ワークス（事業計画）", { x: 0.4, y: 3.2, w: 3.0, h: 0.3, size: 11, color: K.paper });
     txt(s, "三現＝現場・現物・現実", { x: 0.4, y: 3.52, w: 3.0, h: 0.28, size: 9.5, color: K.paper });
@@ -150,9 +155,9 @@ async function main() {
     txt(s, "事業計画書", { x: rx, y: 0.55, w: rw, h: 0.28, size: S.lead, color: K.gray700 });
     txt(s, "人が減っても、\n現場が迷わず回る仕組みをつくる", { x: rx, y: 0.9, w: rw, h: 0.85, size: 22, bold: true, lsm: 1.2 });
     txt(s, "スマートグラスで熟練者の作業を記録し、報告を自動にし、次の担い手とAIの教材にする", { x: rx, y: 1.85, w: rw, h: 0.5, size: 11.5 });
-    box(s, { x: rx, y: 2.6, w: rw, h: 1.3, line: K.ink, lw: T.stroke.strong, name: "ask" });
+    box(s, { x: rx, y: 2.6, w: rw, h: 1.3, line: ACC, lw: 2, name: "ask" });
     txt(s, "希望金額", { x: rx + 0.2, y: 2.68, w: 2, h: 0.3, size: 12, bold: true, color: K.gray700 });
-    txt(s, "500万円", { x: rx + 0.2, y: 2.95, w: 3.2, h: 0.8, size: 44, bold: true, valign: "middle" });
+    txt(s, "500万円", { x: rx + 0.2, y: 2.95, w: 3.2, h: 0.8, size: 44, bold: true, color: ACC, valign: "middle" });
     txt(s, "準備期6か月の資金\n（出資）", { x: rx + 3.45, y: 3.05, w: 1.75, h: 0.6, size: 10, color: K.gray700, valign: "middle" });
     txt(s, "志願者：＿＿＿＿＿＿＿＿＿＿", { x: rx, y: 4.25, w: rw, h: 0.3, size: 10.5, color: K.gray700 });
   }
@@ -326,19 +331,19 @@ async function main() {
     const rx = 5.15, rw = 4.45;
     table(s, [
       ["区分", "規模", "根拠"],
-      ["TAM 製造", "42億米ドル（2025年）", "国内スマートファクトリー市場 (1)"],
-      ["TAM 建設", "1,845億円→3,000億円超", "国内建設テック市場 2023→2030年度 (2)"],
+      ["TAM 製造", "42億→92億米ドル", "国内スマートファクトリー市場 2025→2034年 (1)"],
+      ["TAM 建設", "1,845億円→3,043億円", "国内建設テック市場（建築分野）2023→2030年度 (2)"],
       ["SAM", "約100億円", "電線・ケーブル製造353事業所 (3)＋中堅以上の電気工事会社 約3,000社 (4)、×年300万円"],
       ["SOM", "2.55億円（シェア2.5%）", "5年目85拠点×年300万円"],
     ], { x: rx, y: 1.15, w: rw, colW: [0.8, 1.45, 2.2], rowH: 0.42, size: 8, leftCols: [1, 2], name: "market" });
     box(s, { x: rx, y: 3.55, w: rw, h: 1.1, fill: K.ink, name: "growth" });
     txt(s, "市場の伸び率", { x: rx + 0.15, y: 3.6, w: rw - 0.3, h: 0.28, size: 10.5, bold: true, color: K.paper });
     txt(s, [
-      run("国内スマートファクトリー：年9.0%成長（2026〜2034年予測）(1)", { breakLine: true }),
-      run("国内建設テック：年約7.2%成長（2023→2030年度から算出）(2)", { breakLine: true }),
+      run("国内スマートファクトリー：年9.03%成長（2026〜2034年予測）(1)", { breakLine: true }),
+      run("国内建設テック（建築分野）：年7.4%成長（2023→2030年度予測）(2)", { breakLine: true }),
       run("追い風：内閣府「人工知能基本計画」が暗黙知の多い現場へのAI実装を推進"),
     ], { x: rx + 0.15, y: 3.9, w: rw - 0.3, h: 0.72, size: 8.5, color: K.paper, psa: 2 });
-    txt(s, "(1) IMARC Group（2034年に92億米ドル、年平均9.03%）　(2) 矢野経済研究所　(3) 経済産業省「経済構造実態調査」2024年（従業者10人以上）　(4) 国土交通省「建設業許可業者数調査」の電気工事業63,144社から資本金5,000万円以上を推計（電気通信工事業を含む）", { x: X0, y: 4.94, w: W, h: 0.32, size: S.note, color: K.gray500 });
+    txt(s, "(1) IMARC Group「Japan Smart Factory Market」　(2) 矢野経済研究所 プレスリリースNo.3789（2025年4月）建築分野ソフトウェア　(3) 経済産業省「経済構造実態調査」2024年　(4) 電気工事業の許可業者65,497社（令和7年3月末、国土交通省）から推計", { x: X0, y: 4.9, w: W, h: 0.3, size: S.note, color: K.gray500 });
   }
 
   // ---------- Slide 4 収益の仕組み ----------
@@ -438,7 +443,7 @@ async function main() {
       ["雑費", "100", "190", "200"],
       ["販管費 合計", "3,680", "7,880", "14,370"],
     ], { x: rx, y: top + 0.3, w: rw, colW: [2.05, 0.83, 0.83, 0.84], rowH: 0.3, size: 8, strongRows: [9], name: "costs" });
-    txt(s, "人件費は1人年800万円（給与600万円＋法定福利・採用・教育200万円）。家賃は1年目月20万円・5年目月50万円", { x: rx, y: 4.6, w: rw, h: 0.4, size: S.note, color: K.gray500 });
+    txt(s, "所在地案：川崎市（準備期は川崎・横浜のインキュベーション施設）。家賃は1年目15坪・月20万円、5年目40坪・月50万円。人件費は1人年800万円", { x: rx, y: 4.6, w: rw, h: 0.4, size: S.note, color: K.gray500 });
     txt(s, "売上の内訳：既存顧客の利用料（前年末拠点×300万円）＋新規の利用料（新規×300万円×0.5）＋導入支援（新規×200万円）＋受託開発", { x: X0, y: 5.04, w: W, h: 0.22, size: S.note, color: K.gray500 });
   }
 
