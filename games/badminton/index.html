@@ -1,0 +1,1100 @@
+<title>ラリーIQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: 夜のアリーナ。縦長のシングルスコートが主役、スコアボードは上、判断ログは横（狭い画面では下）。
+   単一テーマ（体育館の照明に浮かぶグリーンのコートマット）を意図的に採用。 */
+:root {
+  color-scheme: dark;
+  --arena: #0d1719;
+  --arena-2: #142226;
+  --mat: #1f5e4c;
+  --mat-dark: #19503f;
+  --line: #f1f4ec;
+  --ink: #e6eee8;
+  --muted: #8ea39a;
+  --rule: #26393c;
+  --you: #f4b63f;
+  --cpu: #ee6c5a;
+  --best: #5fd6a2;
+  --good: #8cc6e8;
+  --ok: #d8c86a;
+  --bad: #ee6c5a;
+  --font-display: "Saira Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: radial-gradient(120% 80% at 50% 0%, var(--arena-2), var(--arena) 60%);
+  background-color: var(--arena);
+  color: var(--ink);
+  font-family: var(--font-body);
+  overflow: hidden;
+}
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding-inline: 16px;
+  padding-block: 10px;
+  gap: 8px;
+  box-sizing: border-box;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+/* スコアボード */
+.board {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.side { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.side.cpu { justify-content: flex-end; }
+.side .name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+}
+.side.you .name { color: var(--you); }
+.side.cpu .name { color: var(--cpu); }
+.side .pts {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2.6rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.serve-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--line);
+  align-self: center;
+  visibility: hidden;
+}
+.serve-dot.on { visibility: visible; }
+.meta {
+  text-align: center;
+  font-family: var(--font-display);
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+.meta b { color: var(--ink); font-weight: 700; display: block; font-size: 1rem; letter-spacing: 0.06em; }
+
+/* 中央：コート + ログ */
+.main {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 16px;
+}
+.stage { position: relative; min-height: 0; min-width: 0; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: manipulation; cursor: pointer; display: block; }
+
+.panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-left: 1px solid var(--rule);
+  padding-left: 16px;
+}
+.panel h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; overflow: auto; min-height: 0; }
+.log li {
+  display: grid;
+  grid-template-columns: 52px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.82rem;
+  padding-block: 4px;
+  border-bottom: 1px solid var(--rule);
+}
+.log .shot { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log .t { font-family: var(--font-display); font-variant-numeric: tabular-nums; color: var(--muted); }
+.log .empty { color: var(--muted); display: block; border: 0; font-size: 0.82rem; line-height: 1.6; }
+.chip {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-align: center;
+  border-radius: 3px;
+  padding: 2px 0;
+  color: var(--arena);
+}
+.r-BEST { background: var(--best); }
+.r-GOOD { background: var(--good); }
+.r-OK { background: var(--ok); }
+.r-BAD, .r-LATE { background: var(--bad); }
+.live { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.live div { display: flex; flex-direction: column; }
+.live span { font-size: 0.72rem; color: var(--muted); }
+.live strong { font-family: var(--font-display); font-size: 1.35rem; font-variant-numeric: tabular-nums; font-weight: 700; }
+.keys { font-size: 0.75rem; color: var(--muted); line-height: 1.7; }
+kbd {
+  font-family: var(--font-display);
+  border: 1px solid var(--rule);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 0 5px;
+  color: var(--ink);
+  background: var(--arena-2);
+}
+
+/* 下部のフィードバック帯 */
+.strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 0.9rem;
+}
+.strip .msg { min-width: 0; flex: 1; line-height: 1.4; }
+.strip .msg small { color: var(--muted); display: block; font-size: 0.78rem; }
+.icon-btn {
+  font: 500 0.78rem var(--font-body);
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.icon-btn:hover { border-color: var(--muted); }
+button:focus-visible, .opt:focus-within { outline: 2px solid var(--you); outline-offset: 2px; }
+
+/* オーバーレイ（タイトル / リザルト） */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  background: color-mix(in srgb, var(--arena) 84%, transparent);
+  backdrop-filter: blur(3px);
+  overflow: auto;
+  z-index: 2;
+}
+.card {
+  margin: auto;
+  width: min(440px, 100%);
+  box-sizing: border-box;
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.title-block .eyebrow {
+  font-family: var(--font-display);
+  letter-spacing: 0.24em;
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.title-block h1 {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2.8rem, 12vw, 4.2rem);
+  line-height: 0.9;
+  letter-spacing: 0.01em;
+  font-style: italic;
+}
+.title-block h1 em { font-style: italic; color: var(--you); }
+.title-block p { margin: 10px 0 0; color: var(--muted); font-size: 0.88rem; line-height: 1.7; text-wrap: pretty; }
+.group { display: flex; flex-direction: column; gap: 6px; }
+.group > span {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.seg.two { grid-template-columns: repeat(2, 1fr); }
+.opt { position: relative; }
+.opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.opt label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 4px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+}
+.opt label small { font-weight: 400; color: var(--muted); font-size: 0.68rem; font-family: var(--font-display); letter-spacing: 0.04em; }
+.opt input:checked + label { border-color: var(--you); background: color-mix(in srgb, var(--you) 14%, transparent); }
+.rules { margin: 0; padding-left: 1.2em; color: var(--ink); font-size: 0.84rem; line-height: 1.75; }
+.rules b { color: var(--you); font-weight: 700; }
+.cta {
+  font: 800 1.15rem var(--font-display);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 12px;
+  color: var(--arena);
+  background: var(--you);
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.cta:hover { filter: brightness(1.08); }
+.best-line { font-size: 0.78rem; color: var(--muted); text-align: center; min-height: 1em; }
+
+.result h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 3rem; line-height: 1; font-style: italic; }
+.result .final { font-family: var(--font-display); font-size: 1.4rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.iq { display: flex; align-items: baseline; gap: 10px; border-block: 1px solid var(--rule); padding-block: 10px; }
+.iq strong { font-family: var(--font-display); font-size: 3.4rem; font-weight: 800; line-height: 1; color: var(--you); font-variant-numeric: tabular-nums; }
+.iq span { color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
+.grid-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.grid-stats div { display: flex; flex-direction: column; }
+.grid-stats span { font-size: 0.72rem; color: var(--muted); }
+.grid-stats strong { font-family: var(--font-display); font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.advice { margin: 0; font-size: 0.86rem; line-height: 1.7; }
+.advice b { color: var(--you); }
+.row-btns { display: flex; gap: 8px; }
+.row-btns > * { flex: 1; }
+
+@media (max-width: 760px) {
+  .main { grid-template-columns: minmax(0, 1fr); }
+  .panel { display: none; }
+  .side .pts { font-size: 2.1rem; }
+  .strip { font-size: 0.82rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
+}
+</style>
+
+<div class="app">
+  <header class="board" aria-label="スコア">
+    <div class="side you">
+      <span class="name">You</span>
+      <span class="pts" id="ptsP">0</span>
+      <span class="serve-dot" id="srvP" title="サーブ権"></span>
+    </div>
+    <div class="meta"><b id="metaDiff">部活</b><span id="metaRally">RALLY 0</span></div>
+    <div class="side cpu">
+      <span class="serve-dot" id="srvO" title="サーブ権"></span>
+      <span class="pts" id="ptsO">0</span>
+      <span class="name">CPU</span>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="stage" id="stage">
+      <canvas id="court" aria-label="コート。相手コートの6ゾーンをタップして配球を選ぶ"></canvas>
+
+      <div class="overlay" id="titleScreen">
+        <div class="card">
+          <div class="title-block">
+            <div class="eyebrow">Badminton singles · shot selection</div>
+            <h1>ラリー<em>IQ</em></h1>
+            <p>相手が打った瞬間から、シャトルが届くまでが考える時間。相手の位置と戻る方向を読み、6つのゾーンから配球を即決する対戦ゲーム。</p>
+          </div>
+          <div class="group" role="radiogroup" aria-label="難易度">
+            <span>難易度（判断できる時間）</span>
+            <div class="seg">
+              <div class="opt"><input type="radio" name="diff" id="d-beginner" value="beginner"><label for="d-beginner">入門<small>×2.4</small></label></div>
+              <div class="opt"><input type="radio" name="diff" id="d-club" value="club" checked><label for="d-club">部活<small>×1.8</small></label></div>
+              <div class="opt"><input type="radio" name="diff" id="d-expert" value="expert"><label for="d-expert">実業団<small>×1.35</small></label></div>
+              <div class="opt"><input type="radio" name="diff" id="d-pro" value="pro"><label for="d-pro">代表<small>×1.05</small></label></div>
+            </div>
+          </div>
+          <div class="group" role="radiogroup" aria-label="ゲーム形式">
+            <span>形式</span>
+            <div class="seg two">
+              <div class="opt"><input type="radio" name="len" id="l-11" value="11" checked><label for="l-11">11点<small>QUICK · 最大15</small></label></div>
+              <div class="opt"><input type="radio" name="len" id="l-21" value="21"><label for="l-21">21点<small>FULL · 最大30</small></label></div>
+            </div>
+          </div>
+          <ol class="rules">
+            <li>相手コートの<b>6ゾーン</b>をタップ（<kbd>Q</kbd><kbd>E</kbd>奥 / <kbd>A</kbd><kbd>D</kbd>中 / <kbd>Z</kbd><kbd>C</kbd>前）。</li>
+            <li>打てるショットは<b>あなたの打点</b>で変わる。高い打点ならスマッシュ、沈められたらロブかヘアピン。</li>
+            <li>選んだら変更不可。届くまでに選べないと<b>判断遅れ</b>で甘い球になる。</li>
+            <li>相手の矢印は戻る方向。<b>逆を突く</b>と切り返しが遅れる。</li>
+          </ol>
+          <button class="cta" id="startBtn" type="button">Start · 試合開始</button>
+          <div class="best-line" id="bestLine"></div>
+        </div>
+      </div>
+
+      <div class="overlay" id="resultScreen" hidden>
+        <div class="card result">
+          <div>
+            <h2 id="resTitle">WIN</h2>
+            <div class="final" id="resScore">11 – 7</div>
+          </div>
+          <div class="iq">
+            <strong id="resIQ">0</strong>
+            <span>配球IQ<br>BEST=100 / GOOD=75 / OK=45 / BAD=10 / 遅れ=0 の平均</span>
+          </div>
+          <div class="grid-stats">
+            <div><span>BEST率</span><strong id="resBest">0%</strong></div>
+            <div><span>平均判断</span><strong id="resTime">0.00s</strong></div>
+            <div><span>判断遅れ</span><strong id="resLate">0</strong></div>
+            <div><span>エース</span><strong id="resAce">0</strong></div>
+            <div><span>自分のミス</span><strong id="resErr">0</strong></div>
+            <div><span>最長ラリー</span><strong id="resLong">0</strong></div>
+          </div>
+          <p class="advice" id="resAdvice"></p>
+          <div class="row-btns">
+            <button class="icon-btn" id="menuBtn" type="button">難易度を変える</button>
+            <button class="cta" id="againBtn" type="button">Rematch</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="panel" aria-label="判断ログ">
+      <h2>Live</h2>
+      <div class="live">
+        <div><span>BEST率</span><strong id="lvBest">–</strong></div>
+        <div><span>平均判断</span><strong id="lvTime">–</strong></div>
+      </div>
+      <h2>判断ログ</h2>
+      <ul class="log" id="log"><li class="empty">打つたびに、あなたの選択とAI評価の差がここに並びます。</li></ul>
+      <div class="keys">
+        <kbd>Q</kbd> 左奥 <kbd>E</kbd> 右奥<br>
+        <kbd>A</kbd> 左中 <kbd>D</kbd> 右中<br>
+        <kbd>Z</kbd> 左前 <kbd>C</kbd> 右前<br>
+        テンキー <kbd>7</kbd><kbd>9</kbd><kbd>4</kbd><kbd>6</kbd><kbd>1</kbd><kbd>3</kbd> も可
+      </div>
+    </aside>
+  </div>
+
+  <footer class="strip">
+    <div class="msg" id="msg">シャトルが飛んでいる間に、相手コートのゾーンを選ぶ。<small>相手の位置・戻る方向・自分の打点を見て即決。</small></div>
+    <button class="icon-btn" id="soundBtn" type="button" aria-pressed="true">音 ON</button>
+    <button class="icon-btn" id="quitBtn" type="button">中断</button>
+  </footer>
+</div>
+
+<script src="engine.js"></script>
+<script>
+(() => {
+  'use strict';
+  const E = window.RallyEngine;
+  const C = E.C;
+
+  const DIFFS = {
+    beginner: { jp: '入門',   slow: 2.4,  temp: 1.2,  err: 0.04 },
+    club:     { jp: '部活',   slow: 1.8,  temp: 0.6,  err: 0.02 },
+    expert:   { jp: '実業団', slow: 1.35, temp: 0.3,  err: 0.0 },
+    pro:      { jp: '代表',   slow: 1.05, temp: 0.12, err: -0.01 },
+  };
+  const RATING_PTS = { BEST: 100, GOOD: 75, OK: 45, BAD: 10, LATE: 0 };
+  const KEYMAP = { q: 'BL', e: 'BR', a: 'ML', d: 'MR', z: 'FL', c: 'FR', '7': 'BL', '9': 'BR', '4': 'ML', '6': 'MR', '1': 'FL', '3': 'FR' };
+  const KEY_OF = { BL: 'Q', BR: 'E', ML: 'A', MR: 'D', FL: 'Z', FR: 'C' };
+  const CONTACT_H = { HIGH: 2.7, HIGH_LATE: 2.3, MID: 1.4, MID_NET: 1.7, LOW: 0.6, LOW_STRETCH: 0.35, SERVE: 1.0, WINNER: 0.05 };
+  const CAT_COLOR = { HIGH: 'best', HIGH_LATE: 'ok', MID: 'good', MID_NET: 'best', LOW: 'ok', LOW_STRETCH: 'bad', SERVE: 'good', WINNER: 'bad' };
+  const SERVE_WAIT = 6; // 自分のサーブの持ち時間（秒）
+
+  const $ = id => document.getElementById(id);
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  let COL = {};
+  function readColors() {
+    for (const k of ['arena', 'mat', 'mat-dark', 'line', 'ink', 'muted', 'you', 'cpu', 'best', 'good', 'ok', 'bad', 'rule']) COL[k] = css('--' + k);
+  }
+  readColors();
+
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 保存不可でも遊べる */ } },
+  };
+
+  // ---------- 状態 ----------
+  const S = {
+    screen: 'title', diffKey: 'club', target: 11, cap: 15,
+    score: { P: 0, O: 0 }, server: 'P',
+    pl: null, simT: 0, shot: null, phase: 'idle', phaseReal: 0,
+    from: null, cat: null, serve: null,
+    choice: null, windowStart: 0, windowLen: 0,
+    rallyShots: 0, banner: null, fx: [], trail: [],
+    decisions: [], aces: 0, myErrors: 0, longest: 0,
+    hitFlash: { P: -9, O: -9 },
+  };
+  const diff = () => DIFFS[S.diffKey];
+
+  // ---------- 音 ----------
+  let audio = null, soundOn = store.get('rallyiq.sound') !== false;
+  function initAudio() {
+    if (audio || !soundOn) return;
+    try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
+  }
+  function hitSound(power) {
+    if (!audio || !soundOn) return;
+    const t = audio.currentTime;
+    const len = 0.06 + power * 0.05;
+    const buf = audio.createBuffer(1, Math.floor(audio.sampleRate * len), audio.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+    const src = audio.createBufferSource(); src.buffer = buf;
+    const f = audio.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1800 + power * 1600; f.Q.value = 1.4;
+    const g = audio.createGain(); g.gain.setValueAtTime(0.25 + power * 0.5, t);
+    src.connect(f).connect(g).connect(audio.destination); src.start(t);
+  }
+  function tone(freq, dur, vol) {
+    if (!audio || !soundOn) return;
+    const t = audio.currentTime;
+    const o = audio.createOscillator(); o.type = 'triangle'; o.frequency.value = freq;
+    const g = audio.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(audio.destination); o.start(t); o.stop(t + dur);
+  }
+
+  // ---------- キャンバス ----------
+  const canvas = $('court'), ctx = canvas.getContext('2d'), stage = $('stage');
+  const WW = 6.1 + 1.4, WH = 13.4 + 1.6; // 描画するワールド範囲（外周の床を含む）
+  let view = { scale: 1, cx: 0, cy: 0, w: 0, h: 0, dpr: 1 };
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr);
+    const scale = Math.min(r.width / WW, r.height / WH);
+    view = { scale, cx: r.width / 2, cy: r.height / 2, w: r.width, h: r.height, dpr };
+  }
+  new ResizeObserver(resize).observe(stage);
+  resize();
+  const sx = x => view.cx + x * view.scale;
+  const sy = y => view.cy - y * view.scale;
+  const HEIGHT_K = 0.42; // 高さ→画面上方向のずらし（斜め見下ろし風）
+
+  function zoneRect(z) {
+    const x0 = z[1] === 'L' ? -C.HALF_W : 0, x1 = z[1] === 'L' ? 0 : C.HALF_W;
+    const rows = { F: [0, 2.3], M: [2.3, 4.6], B: [4.6, C.HALF_L] }[z[0]];
+    return { x0, x1, y0: rows[0], y1: rows[1] };
+  }
+  function zoneAt(px, py) {
+    const x = (px - view.cx) / view.scale, y = (view.cy - py) / view.scale;
+    if (y < -0.2 || y > C.HALF_L + 0.6 || Math.abs(x) > C.HALF_W + 0.5) return null;
+    const col = x < 0 ? 'L' : 'R';
+    const row = y < 2.3 ? 'F' : y < 4.6 ? 'M' : 'B';
+    return row + col;
+  }
+
+  // ---------- ゲーム進行 ----------
+  function newMatch() {
+    S.diffKey = document.querySelector('input[name="diff"]:checked').value;
+    S.target = +document.querySelector('input[name="len"]:checked').value;
+    S.cap = S.target === 11 ? 15 : 30;
+    S.score = { P: 0, O: 0 }; S.server = 'P';
+    S.decisions = []; S.aces = 0; S.myErrors = 0; S.longest = 0;
+    $('log').innerHTML = '';
+    $('metaDiff').textContent = diff().jp;
+    S.screen = 'play';
+    $('titleScreen').hidden = true; $('resultScreen').hidden = true;
+    initAudio();
+    updateBoard(); updateLive();
+    startRally();
+  }
+
+  function startRally() {
+    S.pl = { P: E.makePlayer('P'), O: E.makePlayer('O') };
+    S.serve = E.serveSetup(S.server, S.score[S.server]);
+    const rcv = S.server === 'P' ? 'O' : 'P';
+    Object.assign(S.pl[S.server], { lastHit: S.serve.serverPos, lastHitT: 0 });
+    Object.assign(S.pl[rcv], { lastHit: S.serve.receiverPos, lastHitT: 0 });
+    S.simT = 0; S.shot = null; S.trail = [];
+    S.from = S.serve.serverPos; S.cat = 'SERVE';
+    S.rallyShots = 0; S.choice = null; S.banner = null;
+    S.phase = 'serveWait'; S.phaseReal = performance.now();
+    if (S.server === 'P') {
+      S.windowStart = performance.now(); S.windowLen = SERVE_WAIT;
+      setMsg('あなたのサーブ。対角の列から選ぶ', '前 = ショート / 中 = ドライブサーブ / 奥 = ロングサーブ');
+    } else {
+      setMsg('相手のサーブ', 'シャトルが届くまでに返球先を決める');
+    }
+    updateBoard();
+  }
+
+  function doHit(hitterId, zone, opts) {
+    const rcvId = hitterId === 'P' ? 'O' : 'P';
+    const shot = E.execute(S.pl[hitterId], S.pl[rcvId], S.from, S.cat, zone, S.simT, Math.random, opts);
+    E.commitHit(S.pl[hitterId], S.from, S.simT);
+    S.shot = shot; S.phase = 'flight'; S.rallyShots++;
+    S.hitFlash[hitterId] = performance.now();
+    S.trail = [];
+    const power = shot.cls === 'fast' ? 1 : shot.cls === 'flat' ? 0.6 : shot.cls === 'high' ? 0.45 : 0.15;
+    hitSound(power);
+    if (rcvId === 'P') {
+      S.choice = null;
+      S.windowStart = performance.now();
+      S.windowLen = shot.F * diff().slow;
+    }
+    $('metaRally').textContent = 'RALLY ' + S.rallyShots;
+  }
+
+  function grade(ranked, zone, late) {
+    if (late) return { rating: 'LATE', best: ranked[0] };
+    const best = ranked[0];
+    const mine = ranked.find(r => r.zone === zone);
+    const gap = best.value - mine.value;
+    const rating = gap < 0.05 ? 'BEST' : gap < 0.35 ? 'GOOD' : gap < 0.8 ? 'OK' : 'BAD';
+    return { rating, best, mine };
+  }
+
+  function playerHit(zone, late) {
+    const ranked = E.rankOptions(S.pl.P, S.pl.O, S.from, S.cat, S.simT, S.serve.serveCol);
+    if (late) {
+      const valid = E.validZones(S.cat, S.serve.serveCol);
+      zone = valid.filter(z => z[0] !== 'M')[Math.floor(Math.random() * 2)] || valid[0];
+    }
+    const g = grade(ranked, zone, late);
+    const rt = late ? S.windowLen : (S.choice.real - S.windowStart) / 1000;
+    const type = E.MENU[S.cat][{ B: 'back', M: 'mid', F: 'front' }[zone[0]]];
+    const d = { rating: g.rating, rt, cat: S.cat, type, zone, best: g.best };
+    S.decisions.push(d);
+    doHit('P', zone, late ? { forcedQ: 0.7 } : undefined);
+    d.turn = S.shot.turn;
+    logDecision(d);
+    feedback(d);
+    updateLive();
+  }
+
+  function cpuHit() {
+    const ranked = E.rankOptions(S.pl.O, S.pl.P, S.from, S.cat, S.simT, S.serve.serveCol);
+    const zone = E.aiChoose(ranked, diff().temp, Math.random);
+    doHit('O', zone, { extraErr: diff().err });
+  }
+
+  function resolveArrival() {
+    const shot = S.shot;
+    if (shot.error || shot.winner) return endRally(shot);
+    // 受け手が打つ
+    S.from = { x: shot.to.x, y: shot.to.y };
+    S.cat = shot.rcvCat;
+    S.simT = shot.t0 + shot.F;
+    if (shot.receiver === 'O') cpuHit();
+    else playerHit(S.choice ? S.choice.zone : null, !S.choice);
+  }
+
+  function endRally(shot) {
+    const winner = shot.error ? shot.receiver : shot.hitter;
+    S.score[winner]++;
+    S.longest = Math.max(S.longest, S.rallyShots);
+    const name = E.SHOTS[shot.type].jp;
+    let head, sub;
+    if (shot.error) {
+      const how = shot.error === 'net' ? 'ネット' : 'アウト';
+      if (shot.hitter === 'P') { S.myErrors++; head = how; sub = `あなたの${name}がミス`; }
+      else { head = how; sub = `相手の${name}がミス`; }
+    } else {
+      if (shot.hitter === 'P') { S.aces++; head = 'エース'; sub = `${name}で取った`; }
+      else { head = '届かない'; sub = `相手の${name}に間に合わず`; }
+    }
+    S.banner = { head, sub, winner, at: performance.now() };
+    S.phase = 'dead'; S.phaseReal = performance.now();
+    tone(winner === 'P' ? 880 : 330, 0.25, 0.12);
+    S.server = winner;
+    updateBoard();
+  }
+
+  function gameOver() {
+    const a = S.score.P, b = S.score.O;
+    if (a === S.cap || b === S.cap) return true;
+    return (a >= S.target || b >= S.target) && Math.abs(a - b) >= 2;
+  }
+
+  // ---------- 入力 ----------
+  function choose(zone) {
+    if (S.screen !== 'play' || !zone) return;
+    if (S.phase === 'serveWait' && S.server === 'P') {
+      if (!E.validZones('SERVE', S.serve.serveCol).includes(zone)) { setMsg('サーブは対角へ', '光っている列から選ぶ'); return; }
+      S.choice = { zone, real: performance.now() };
+      playerHit(zone, false);
+      return;
+    }
+    if (S.phase === 'flight' && S.shot && S.shot.receiver === 'P' && !S.choice) {
+      S.choice = { zone, real: performance.now() };
+      tone(1320, 0.05, 0.05);
+    }
+  }
+  canvas.addEventListener('pointerdown', e => {
+    const r = canvas.getBoundingClientRect();
+    choose(zoneAt(e.clientX - r.left, e.clientY - r.top));
+  });
+  window.addEventListener('keydown', e => {
+    if (e.target && e.target.tagName === 'INPUT' && e.key === ' ') return;
+    const z = KEYMAP[e.key.toLowerCase()];
+    if (z && S.screen === 'play') { e.preventDefault(); choose(z); return; }
+    if ((e.key === 'Enter') && S.screen !== 'play') { e.preventDefault(); newMatch(); }
+  });
+
+  // ---------- UI 更新 ----------
+  function setMsg(main, sub) {
+    $('msg').innerHTML = '';
+    $('msg').append(document.createTextNode(main));
+    if (sub) { const s = document.createElement('small'); s.textContent = sub; $('msg').append(s); }
+  }
+  function updateBoard() {
+    $('ptsP').textContent = S.score.P; $('ptsO').textContent = S.score.O;
+    $('srvP').classList.toggle('on', S.server === 'P');
+    $('srvO').classList.toggle('on', S.server === 'O');
+  }
+  function stats() {
+    const ds = S.decisions;
+    if (!ds.length) return null;
+    const pts = ds.reduce((a, d) => a + RATING_PTS[d.rating], 0) / ds.length;
+    const best = ds.filter(d => d.rating === 'BEST').length / ds.length;
+    const timed = ds.filter(d => d.rating !== 'LATE');
+    const avg = timed.length ? timed.reduce((a, d) => a + d.rt, 0) / timed.length : 0;
+    const late = ds.length - timed.length;
+    return { iq: Math.round(pts), best, avg, late, n: ds.length };
+  }
+  function updateLive() {
+    const st = stats();
+    $('lvBest').textContent = st ? Math.round(st.best * 100) + '%' : '–';
+    $('lvTime').textContent = st ? st.avg.toFixed(2) + 's' : '–';
+  }
+  function logDecision(d) {
+    const li = document.createElement('li');
+    const chip = document.createElement('span'); chip.className = 'chip r-' + d.rating; chip.textContent = d.rating;
+    const shot = document.createElement('span'); shot.className = 'shot';
+    shot.textContent = `${E.SHOTS[d.type].jp} ${E.zoneName(d.zone, 'P')}`;
+    if (d.rating !== 'BEST' && d.best) shot.title = '推奨: ' + E.SHOTS[d.best.plan.type].jp + ' ' + E.zoneName(d.best.zone, 'P');
+    const t = document.createElement('span'); t.className = 't'; t.textContent = d.rating === 'LATE' ? '—' : d.rt.toFixed(2) + 's';
+    li.append(chip, shot, t);
+    const log = $('log');
+    log.prepend(li);
+    while (log.children.length > 40) log.lastChild.remove();
+  }
+  function feedback(d) {
+    const label = { BEST: 'BEST', GOOD: 'GOOD', OK: 'OK', BAD: 'BAD', LATE: '判断遅れ' }[d.rating];
+    const mine = `${E.SHOTS[d.type].jp}（${E.zoneName(d.zone, 'P')}）`;
+    const bestTxt = d.best ? `${E.SHOTS[d.best.plan.type].jp}（${E.zoneName(d.best.zone, 'P')}・相手の余裕 ${Math.max(0, d.best.plan.margin).toFixed(2)}秒）` : '';
+    let sub = d.rating === 'BEST' ? `相手の余裕 ${Math.max(0, d.best.plan.margin).toFixed(2)}秒` : '推奨: ' + bestTxt;
+    if (d.turn > 0.08) sub = '逆を突いた！ ' + sub;
+    setMsg(`${label} ${d.rating === 'LATE' ? '' : d.rt.toFixed(2) + 's '}${mine}`, sub);
+    S.fx.push({ kind: 'rating', text: label, rating: d.rating, at: performance.now() });
+  }
+
+  function showResult() {
+    S.screen = 'result';
+    const st = stats() || { iq: 0, best: 0, avg: 0, late: 0, n: 0 };
+    const won = S.score.P > S.score.O;
+    $('resTitle').textContent = won ? 'WIN' : 'LOSE';
+    $('resTitle').style.color = won ? 'var(--you)' : 'var(--cpu)';
+    $('resScore').textContent = `${S.score.P} – ${S.score.O}  ·  ${diff().jp}`;
+    $('resIQ').textContent = st.iq;
+    $('resBest').textContent = Math.round(st.best * 100) + '%';
+    $('resTime').textContent = st.avg.toFixed(2) + 's';
+    $('resLate').textContent = st.late;
+    $('resAce').textContent = S.aces;
+    $('resErr').textContent = S.myErrors;
+    $('resLong').textContent = S.longest;
+    $('resAdvice').innerHTML = '';
+    $('resAdvice').append(...adviceNodes(st));
+
+    const key = 'rallyiq.best.' + S.diffKey;
+    const prev = store.get(key);
+    if (!prev || st.iq > prev.iq) store.set(key, { iq: st.iq, won, score: `${S.score.P}-${S.score.O}` });
+    renderBestLine();
+    $('resultScreen').hidden = false;
+  }
+
+  // 打点カテゴリ別に、平均点が最も低い場面を弱点として挙げる
+  function adviceNodes(st) {
+    const by = {};
+    for (const d of S.decisions) {
+      if (d.cat === 'SERVE') continue;
+      (by[d.cat] = by[d.cat] || []).push(RATING_PTS[d.rating]);
+    }
+    let worst = null;
+    for (const [cat, arr] of Object.entries(by)) {
+      if (arr.length < 3) continue;
+      const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+      if (!worst || avg < worst.avg) worst = { cat, avg, n: arr.length };
+    }
+    const out = [];
+    const b = t => { const e = document.createElement('b'); e.textContent = t; return e; };
+    const tx = t => document.createTextNode(t);
+    if (worst) {
+      out.push(tx('弱点は '), b(E.MENU[worst.cat].jp), tx(` からの判断（${worst.n}回・平均 ${Math.round(worst.avg)}点）。`));
+      const tips = {
+        HIGH: '高い打点は攻めの起点。相手がホームに戻り切る前なら、スマッシュより前への球が効く場面も多い。',
+        HIGH_LATE: '打点が遅れたら無理に沈めず、クリアーで時間を作るのが基本。',
+        MID: '平行球は相手の体勢を見て。前に詰めている相手にはロングドライブで奥を突く。',
+        MID_NET: '白帯より上で触れたらプッシュのチャンス。相手が前にいるならロブで逃がさない。',
+        LOW: '沈められた球は、相手が後ろならヘアピン、前に詰めているならロブ。',
+        LOW_STRETCH: '体勢が崩れたら高く深いロブで立て直す。甘いヘアピンは押し込まれる。',
+      };
+      out.push(tx(' ' + (tips[worst.cat] || '')));
+    } else {
+      out.push(tx('サンプルが少ないので、次はもう少し長いラリーで判断を重ねてみよう。'));
+    }
+    if (st.late > 0) out.push(tx(` 判断遅れ ${st.late}回。迷ったら「相手から一番遠いゾーン」を即決する癖を。`));
+    return out;
+  }
+
+  function renderBestLine() {
+    const parts = [];
+    for (const [k, v] of Object.entries(DIFFS)) {
+      const b = store.get('rallyiq.best.' + k);
+      if (b) parts.push(`${v.jp} IQ ${b.iq}`);
+    }
+    $('bestLine').textContent = parts.length ? '自己ベスト: ' + parts.join(' · ') : '';
+  }
+
+  // ---------- メインループ ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (S.screen === 'play') step(now, dt);
+    draw(now);
+    requestAnimationFrame(frame);
+  }
+
+  function step(now, dt) {
+    if (S.phase === 'serveWait') {
+      const el = (now - S.phaseReal) / 1000;
+      if (S.server === 'O' && el > 0.9) cpuHit();
+      else if (S.server === 'P' && el > SERVE_WAIT) { S.choice = null; playerHit(null, true); }
+      return;
+    }
+    if (S.phase === 'flight') {
+      S.simT += dt / diff().slow;
+      const shot = S.shot;
+      const endT = shot.t0 + shot.F * (shot.error === 'net' ? 0.55 : 1);
+      if (S.simT >= endT) {
+        if (shot.error) { S.simT = endT; endRally(shot); }
+        else resolveArrival();
+      }
+      return;
+    }
+    if (S.phase === 'dead') {
+      // 打ち終わった後も少しだけ時間を進めて余韻を見せる
+      S.simT += dt / diff().slow * 0.5;
+      if ((now - S.phaseReal) / 1000 > 1.6) {
+        if (gameOver()) { S.phase = 'idle'; showResult(); }
+        else startRally();
+      }
+    }
+  }
+
+  // ---------- 描画 ----------
+  function playerVisual(id, T) {
+    const pl = S.pl[id];
+    const shot = S.shot;
+    if (shot && shot.receiver === id && T >= shot.t0) {
+      const start = shot.rcvStart;
+      const depart = shot.t0 + C.REACT + shot.turn;
+      const dx = shot.to.x - start.x, dy = shot.to.y - start.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 1e-6) return { x: start.x, y: start.y };
+      const maxTravel = Math.max(0, d - C.REACH * 0.7);
+      const tr = Math.min(maxTravel, Math.max(0, T - depart) * C.SPEED);
+      return { x: start.x + dx / d * tr, y: start.y + dy / d * tr };
+    }
+    return E.posAt(pl, T);
+  }
+
+  function shuttleAt(shot, T) {
+    const dur = shot.F * (shot.error === 'net' ? 0.55 : 1);
+    const s = Math.max(0, Math.min(1, (T - shot.t0) / dur));
+    const tgt = shot.error ? shot.end : shot.to;
+    const ease = shot.cls === 'fast' || shot.cls === 'flat' ? 1 - Math.pow(1 - s, 1.4) : s;
+    const x = shot.from.x + (tgt.x - shot.from.x) * ease;
+    const y = shot.from.y + (tgt.y - shot.from.y) * ease;
+    const h0 = CONTACT_H[shot.category] || 1;
+    let h1 = shot.winner || shot.error ? 0 : CONTACT_H[shot.rcvCat] || 0.5;
+    if (shot.error === 'net') h1 = 1.2;
+    const peak = { high: 5.2, short: 0.6, flat: 0.25, fast: 0 }[shot.cls];
+    const h = h0 + (h1 - h0) * s + 4 * peak * s * (1 - s);
+    return { x, y, h, s };
+  }
+
+  function draw(now) {
+    const { dpr, w, h } = view;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    drawCourt();
+    const T = S.simT;
+    const playing = S.screen === 'play' || S.screen === 'result';
+    if (playing && S.pl) {
+      drawZones(now);
+      const pO = playerVisual('O', T), pP = playerVisual('P', T);
+      drawRecoveryArrow('O', T, pO);
+      drawPlayer('O', pO, now);
+      drawPlayer('P', pP, now);
+      if (S.shot) drawShuttle(T);
+      drawTimer(now, pP);
+      drawBanner(now);
+    } else {
+      drawIdleScene(now);
+    }
+    drawFx(now);
+  }
+
+  function drawCourt() {
+    const s = view.scale;
+    // 外周の床
+    ctx.fillStyle = COL['mat-dark'];
+    ctx.fillRect(sx(-3.05 - 0.5), sy(6.7 + 0.5), 7.1 * s, 14.4 * s);
+    ctx.fillStyle = COL.mat;
+    ctx.fillRect(sx(-3.05), sy(6.7), 6.1 * s, 13.4 * s);
+    ctx.strokeStyle = COL.line; ctx.lineWidth = Math.max(1, s * 0.04);
+    const L = (x0, y0, x1, y1) => { ctx.beginPath(); ctx.moveTo(sx(x0), sy(y0)); ctx.lineTo(sx(x1), sy(y1)); ctx.stroke(); };
+    ctx.strokeRect(sx(-3.05), sy(6.7), 6.1 * s, 13.4 * s);           // ダブルス外枠
+    L(-C.HALF_W, -6.7, -C.HALF_W, 6.7); L(C.HALF_W, -6.7, C.HALF_W, 6.7); // シングルス サイドライン
+    for (const sgn of [-1, 1]) {
+      L(-3.05, sgn * C.SHORT_LINE, 3.05, sgn * C.SHORT_LINE);         // ショートサービスライン
+      L(-3.05, sgn * 5.94, 3.05, sgn * 5.94);                          // ダブルス ロングサービスライン
+      L(0, sgn * C.SHORT_LINE, 0, sgn * 6.7);                          // センターライン
+    }
+    // ネット
+    ctx.strokeStyle = COL.ink; ctx.lineWidth = Math.max(2, s * 0.07);
+    L(-3.25, 0, 3.25, 0);
+    ctx.fillStyle = COL.ink;
+    for (const x of [-3.25, 3.25]) { ctx.beginPath(); ctx.arc(sx(x), sy(0), Math.max(2, s * 0.09), 0, Math.PI * 2); ctx.fill(); }
+  }
+
+  function drawZones(now) {
+    const s = view.scale;
+    const myTurn = (S.phase === 'serveWait' && S.server === 'P') ||
+                   (S.phase === 'flight' && S.shot && S.shot.receiver === 'P');
+    if (!myTurn) return;
+    const cat = S.phase === 'serveWait' ? 'SERVE' : S.shot.predCat;
+    if (cat === 'WINNER') {
+      label(0, 3.4, '間に合わない…', COL.bad, 0.5 * s, 800);
+      return;
+    }
+    const valid = E.validZones(cat, S.serve.serveCol);
+    const fine = matchMedia('(pointer: fine)').matches;
+    for (const z of E.ZONES) {
+      const r = zoneRect(z);
+      const isValid = valid.includes(z);
+      const chosen = S.choice && S.choice.zone === z;
+      const x = sx(r.x0) + 2, y = sy(r.y1) + 2, ww = (r.x1 - r.x0) * s - 4, hh = (r.y1 - r.y0) * s - 4;
+      ctx.globalAlpha = !isValid ? 0.15 : chosen ? 0.55 : S.choice ? 0.12 : 0.22;
+      ctx.fillStyle = chosen ? COL.you : COL.line;
+      ctx.fillRect(x, y, ww, hh);
+      ctx.globalAlpha = 1;
+      if (chosen) { ctx.strokeStyle = COL.you; ctx.lineWidth = 2; ctx.strokeRect(x, y, ww, hh); }
+      if (!isValid) continue;
+      const cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;
+      const txt = E.zoneLabel(z, cat);
+      ctx.globalAlpha = S.choice && !chosen ? 0.35 : 1;
+      label(cx, cy + 0.12, txt, chosen ? COL.arena : COL.ink, Math.min(0.36 * s, ww / txt.length * 1.05), 700);
+      if (fine) label(cx, cy - 0.42, KEY_OF[z], chosen ? COL.arena : COL.muted, 0.26 * s, 700, true);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function label(x, y, text, color, size, weight, display) {
+    ctx.fillStyle = color;
+    ctx.font = `${weight || 700} ${Math.round(size)}px ${display ? css('--font-display') : css('--font-body')}`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, sx(x), sy(y));
+  }
+
+  function drawRecoveryArrow(id, T, p) {
+    const st = E.posAt(S.pl[id], T);
+    const receiving = S.shot && S.shot.receiver === id && T >= S.shot.t0;
+    const v = receiving ? S.shot.rcvStart : st;
+    if (!v.moving || S.phase === 'dead') return;
+    const s = view.scale, len = 0.9;
+    const x0 = sx(p.x), y0 = sy(p.y), x1 = sx(p.x + v.vx * len), y1 = sy(p.y + v.vy * len);
+    ctx.strokeStyle = COL.cpu; ctx.globalAlpha = 0.8; ctx.lineWidth = Math.max(1.5, s * 0.05);
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    const a = Math.atan2(y1 - y0, x1 - x0), hl = s * 0.22;
+    ctx.beginPath(); ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 - hl * Math.cos(a - 0.5), y1 - hl * Math.sin(a - 0.5));
+    ctx.lineTo(x1 - hl * Math.cos(a + 0.5), y1 - hl * Math.sin(a + 0.5));
+    ctx.closePath(); ctx.fillStyle = COL.cpu; ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawPlayer(id, p, now) {
+    const s = view.scale, r = s * 0.32;
+    const color = id === 'P' ? COL.you : COL.cpu;
+    const x = sx(p.x), y = sy(p.y);
+    // 影
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath(); ctx.ellipse(x, y + r * 0.35, r * 1.05, r * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+    // ラケット（シャトルの方向へ）
+    let ang = id === 'P' ? -Math.PI / 2 : Math.PI / 2;
+    if (S.shot) {
+      const sh = shuttleAt(S.shot, S.simT);
+      ang = Math.atan2(sy(sh.y) - y, sx(sh.x) - x);
+    }
+    const swing = Math.max(0, 1 - (now - S.hitFlash[id]) / 180);
+    ang += swing * 0.9;
+    const rx = x + Math.cos(ang) * r * 1.9, ry = y + Math.sin(ang) * r * 1.9;
+    ctx.strokeStyle = COL.ink; ctx.lineWidth = Math.max(1.5, s * 0.05);
+    ctx.beginPath(); ctx.moveTo(x + Math.cos(ang) * r, y + Math.sin(ang) * r); ctx.lineTo(rx, ry); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(rx + Math.cos(ang) * r * 0.45, ry + Math.sin(ang) * r * 0.45, r * 0.5, r * 0.36, ang, 0, Math.PI * 2); ctx.stroke();
+    // 本体
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = COL.arena; ctx.lineWidth = 2; ctx.stroke();
+    if (swing > 0) {
+      ctx.strokeStyle = color; ctx.globalAlpha = swing; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, r * (1.4 + (1 - swing)), 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawShuttle(T) {
+    const shot = S.shot;
+    const p = shuttleAt(shot, T);
+    const s = view.scale;
+    S.trail.push(p); if (S.trail.length > 14) S.trail.shift();
+    // 着地点の予告（相手の球のみ・入門と部活）
+    // 地面の影
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath(); ctx.ellipse(sx(p.x), sy(p.y), s * 0.1, s * 0.06, 0, 0, Math.PI * 2); ctx.fill();
+    // 軌跡
+    ctx.strokeStyle = COL.line; ctx.lineCap = 'round';
+    for (let i = 1; i < S.trail.length; i++) {
+      const a = S.trail[i - 1], b = S.trail[i];
+      ctx.globalAlpha = i / S.trail.length * 0.5;
+      ctx.lineWidth = Math.max(1, s * 0.05 * i / S.trail.length);
+      ctx.beginPath(); ctx.moveTo(sx(a.x), sy(a.y) - a.h * s * HEIGHT_K); ctx.lineTo(sx(b.x), sy(b.y) - b.h * s * HEIGHT_K); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // シャトル（コルク＋羽根）
+    const X = sx(p.x), Y = sy(p.y) - p.h * s * HEIGHT_K;
+    const tgt = shot.error ? shot.end : shot.to;
+    const dir = Math.atan2(sy(tgt.y) - sy(shot.from.y), sx(tgt.x) - sx(shot.from.x));
+    const scale = 1 + p.h * 0.07;
+    ctx.save(); ctx.translate(X, Y); ctx.rotate(dir);
+    ctx.fillStyle = COL.line;
+    ctx.beginPath();
+    ctx.moveTo(s * 0.1 * scale, 0);
+    ctx.lineTo(-s * 0.16 * scale, -s * 0.11 * scale);
+    ctx.lineTo(-s * 0.16 * scale, s * 0.11 * scale);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = COL.you;
+    ctx.beginPath(); ctx.arc(s * 0.09 * scale, 0, s * 0.055 * scale, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawTimer(now, pP) {
+    const myTurn = (S.phase === 'serveWait' && S.server === 'P') ||
+                   (S.phase === 'flight' && S.shot && S.shot.receiver === 'P' && S.shot.predCat !== 'WINNER');
+    if (!myTurn || S.choice) return;
+    const s = view.scale;
+    const frac = Math.max(0, 1 - (now - S.windowStart) / 1000 / S.windowLen);
+    const x = sx(pP.x), y = sy(pP.y), r = s * 0.62;
+    ctx.lineWidth = Math.max(3, s * 0.08);
+    ctx.strokeStyle = COL.rule; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = frac > 0.5 ? COL.best : frac > 0.25 ? COL.ok : COL.bad;
+    ctx.beginPath(); ctx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac); ctx.stroke();
+    // 打点カテゴリ
+    const cat = S.phase === 'serveWait' ? 'SERVE' : S.shot.predCat;
+    const txt = E.MENU[cat].jp;
+    ctx.font = `700 ${Math.round(s * 0.3)}px ${css('--font-body')}`;
+    const tw = ctx.measureText(txt).width + s * 0.3;
+    const bx = Math.min(Math.max(x - tw / 2, 4), view.w - tw - 4), by = y + r + s * 0.15;
+    ctx.fillStyle = COL[CAT_COLOR[cat]];
+    roundRect(bx, by, tw, s * 0.45, 3); ctx.fill();
+    ctx.fillStyle = COL.arena; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(txt, bx + tw / 2, by + s * 0.23);
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  function drawBanner(now) {
+    const b = S.banner; if (!b) return;
+    const s = view.scale;
+    const t = Math.min(1, (now - b.at) / 200);
+    const y = view.cy;
+    ctx.globalAlpha = 0.9 * t;
+    ctx.fillStyle = COL.arena;
+    ctx.fillRect(sx(-3.4), y - s * 0.95, 6.8 * s, s * 1.9);
+    ctx.globalAlpha = t;
+    ctx.fillStyle = b.winner === 'P' ? COL.you : COL.cpu;
+    ctx.fillRect(sx(-3.4), y - s * 0.95, s * 0.12, s * 1.9);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `800 italic ${Math.round(s * 0.8)}px ${css('--font-display')}, ${css('--font-body')}`;
+    ctx.fillText(b.head, view.cx, y - s * 0.25);
+    ctx.fillStyle = COL.ink;
+    ctx.font = `500 ${Math.round(s * 0.3)}px ${css('--font-body')}`;
+    ctx.fillText(`${b.sub} — ${b.winner === 'P' ? 'あなた' : 'CPU'}の得点`, view.cx, y + s * 0.5);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawFx(now) {
+    S.fx = S.fx.filter(f => now - f.at < 900);
+    for (const f of S.fx) {
+      const k = (now - f.at) / 900;
+      const s = view.scale;
+      ctx.globalAlpha = 1 - k;
+      const colorKey = { BEST: 'best', GOOD: 'good', OK: 'ok', BAD: 'bad', LATE: 'bad' }[f.rating];
+      ctx.fillStyle = COL[colorKey];
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `800 italic ${Math.round(s * 0.7)}px ${css('--font-display')}, ${css('--font-body')}`;
+      ctx.fillText(f.text, view.cx, sy(-1.2) - k * s * 0.8);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // タイトル画面の背景：AI 同士のラリーをゆっくり流す代わりに静かな配置を描く
+  function drawIdleScene(now) {
+    const s = view.scale;
+    const t = now / 1000;
+    const p = { x: Math.sin(t * 0.7) * 1.2, y: -3.1 };
+    const o = { x: Math.cos(t * 0.6) * 1.2, y: 3.1 };
+    ctx.globalAlpha = 0.5;
+    for (const [pos, c] of [[p, COL.you], [o, COL.cpu]]) {
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(sx(pos.x), sy(pos.y), s * 0.32, 0, Math.PI * 2); ctx.fill();
+    }
+    const k = (t * 0.45) % 1, up = Math.floor(t * 0.45) % 2 === 0;
+    const a = up ? p : o, b = up ? o : p;
+    const X = a.x + (b.x - a.x) * k, Y = a.y + (b.y - a.y) * k, H = 4 * 4 * k * (1 - k);
+    ctx.fillStyle = COL.line; ctx.beginPath(); ctx.arc(sx(X), sy(Y) - H * s * HEIGHT_K, s * 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- ボタン ----------
+  $('startBtn').addEventListener('click', newMatch);
+  $('againBtn').addEventListener('click', newMatch);
+  $('menuBtn').addEventListener('click', () => {
+    $('resultScreen').hidden = true; $('titleScreen').hidden = false; S.screen = 'title';
+  });
+  $('quitBtn').addEventListener('click', () => {
+    S.screen = 'title'; S.phase = 'idle'; S.shot = null; S.pl = null;
+    $('resultScreen').hidden = true; $('titleScreen').hidden = false;
+    setMsg('シャトルが飛んでいる間に、相手コートのゾーンを選ぶ。', '相手の位置・戻る方向・自分の打点を見て即決。');
+  });
+  function renderSound() {
+    $('soundBtn').textContent = soundOn ? '音 ON' : '音 OFF';
+    $('soundBtn').setAttribute('aria-pressed', String(soundOn));
+  }
+  $('soundBtn').addEventListener('click', () => {
+    soundOn = !soundOn; store.set('rallyiq.sound', soundOn);
+    if (soundOn) initAudio();
+    renderSound();
+  });
+  for (const k of Object.keys(DIFFS)) {
+    $('d-' + k).addEventListener('change', () => store.set('rallyiq.diff', k));
+  }
+  const savedDiff = store.get('rallyiq.diff');
+  if (savedDiff && DIFFS[savedDiff]) $('d-' + savedDiff).checked = true;
+  renderSound();
+  renderBestLine();
+  if (document.fonts) document.fonts.ready.then(readColors);
+  requestAnimationFrame(frame);
+})();
+</script>
