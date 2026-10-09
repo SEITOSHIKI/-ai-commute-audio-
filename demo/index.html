@@ -1,0 +1,413 @@
+<title>GEN³ Works 現場デモ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a control bar on top, one stage below that switches between four views (glasses / manager / training / overview). The glasses view is always dark: it is a camera feed. */
+:root {
+  --bg: #f4f4f2;
+  --panel: #ffffff;
+  --ink: #1a1a1a;
+  --muted: #5c5c58;
+  --rule: #d4d4cf;
+  --fill: #ebebe7;
+  --signal: #b8680f;      /* AR highlight / attention — the one accent */
+  --signal-soft: #f6e7d2;
+  --ok: #2f6b45;
+  --ng: #a3341f;
+  --glass-bg: #101214;
+  --glass-ink: #e9ece8;
+  --glass-dim: #8d948f;
+  --hud: #f2b45c;
+  --font-sans: "Noto Sans JP", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151615; --panel: #1e1f1e; --ink: #ecece8; --muted: #a3a39d; --rule: #3a3b39; --fill: #2a2b29;
+    --signal: #f0a64a; --signal-soft: #3a2a16; --ok: #7cc496; --ng: #f08a74; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151615; --panel: #1e1f1e; --ink: #ecece8; --muted: #a3a39d; --rule: #3a3b39; --fill: #2a2b29;
+  --signal: #f0a64a; --signal-soft: #3a2a16; --ok: #7cc496; --ng: #f08a74; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-sans); font-size: 14px; line-height: 1.6; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 16px 40px; display: flex; flex-direction: column; gap: 14px; }
+header.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand svg { width: 34px; height: 34px; }
+.brand b { font-size: 18px; letter-spacing: .04em; }
+.brand span { display: block; font-size: 11px; color: var(--muted); letter-spacing: .06em; }
+.sample { font-size: 11px; color: var(--muted); border: 1px solid var(--rule); padding: 2px 8px; border-radius: 3px; }
+nav.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--rule); }
+nav.tabs button { font: inherit; background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 12px; color: var(--muted); cursor: pointer; }
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 700; }
+nav.tabs button:focus-visible, .ctrl button:focus-visible, .steps button:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+.ctrl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ctrl button { font: inherit; font-size: 13px; padding: 6px 14px; border: 1px solid var(--ink); background: var(--panel); color: var(--ink); border-radius: 3px; cursor: pointer; }
+.ctrl button.primary { background: var(--ink); color: var(--panel); }
+.clock { font-family: var(--font-mono); font-size: 13px; color: var(--muted); min-width: 0; }
+.job { font-size: 12px; color: var(--muted); }
+
+/* ---- glasses view ---- */
+.glass { background: var(--glass-bg); color: var(--glass-ink); border-radius: 6px; padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; }
+@media (max-width: 860px) { .glass { grid-template-columns: 1fr; } }
+.viewport { position: relative; border: 1px solid #2c3033; border-radius: 4px; overflow: hidden; aspect-ratio: 16 / 9; max-width: 100%; background: radial-gradient(ellipse at 50% 60%, #22272a 0%, #121516 70%); }
+.viewport svg { display: block; width: 100%; height: 100%; }
+.hud-top { position: absolute; left: 10px; right: 10px; top: 8px; display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono); font-size: 12px; color: var(--hud); pointer-events: none; }
+.rec { color: #ff6b5a; }
+.rec::before { content: "●"; margin-right: 4px; animation: blink 1.2s steps(2, start) infinite; }
+@keyframes blink { to { visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .rec::before { animation: none; } }
+.side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.side h3 { margin: 0; font-size: 12px; font-weight: 500; color: var(--glass-dim); letter-spacing: .06em; }
+.stepnow { font-size: 15px; font-weight: 700; }
+.alert { border: 1px solid var(--hud); background: rgba(242, 180, 92, .1); padding: 8px 10px; border-radius: 4px; font-size: 13px; }
+.alert.okay { border-color: #6fbf8b; background: rgba(111, 191, 139, .1); }
+.alert b { display: block; font-size: 12px; color: var(--hud); }
+.alert.okay b { color: #8fd3a6; }
+.tip { border-left: 0; background: #1b1f21; padding: 8px 10px; border-radius: 4px; font-size: 13px; }
+.tip b { color: var(--glass-dim); font-weight: 500; font-size: 12px; display: block; }
+.ticker { font-family: var(--font-mono); font-size: 12px; color: var(--glass-dim); display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow: auto; }
+.ticker div.new { color: var(--glass-ink); }
+
+/* ---- manager view ---- */
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 14px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 14px 16px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.panel h2 { margin: 0; font-size: 15px; }
+.panel .sub { margin: 0; font-size: 12px; color: var(--muted); }
+.progress { height: 8px; background: var(--fill); border-radius: 4px; overflow: hidden; }
+.progress i { display: block; height: 100%; background: var(--ink); width: 0; transition: width .4s; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.steps li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 4px; border-bottom: 1px solid var(--rule); font-size: 13px; }
+.steps li .n { font-family: var(--font-mono); color: var(--muted); }
+.pill { font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
+.pill.done { border-color: var(--ok); color: var(--ok); }
+.pill.now { border-color: var(--ink); color: var(--ink); font-weight: 700; }
+.pill.flag { border-color: var(--ng); color: var(--ng); }
+.photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+.photo { border: 1px solid var(--rule); border-radius: 4px; overflow: hidden; background: var(--fill); }
+.photo svg { display: block; width: 100%; height: auto; }
+.photo p { margin: 0; padding: 4px 6px; font-size: 11px; line-height: 1.4; }
+.photo p span { color: var(--muted); font-family: var(--font-mono); }
+.report { font-size: 13px; background: var(--fill); border-radius: 4px; padding: 10px 12px; white-space: pre-wrap; font-family: var(--font-sans); min-height: 120px; }
+.report .ng { color: var(--ng); font-weight: 700; }
+.empty { color: var(--muted); font-size: 13px; }
+.kpis { display: flex; flex-wrap: wrap; gap: 16px; }
+.kpis div { min-width: 0; }
+.kpis b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+.kpis span { font-size: 11px; color: var(--muted); }
+
+/* ---- training view ---- */
+.chapters { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.chapters li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.chapters .tc { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.chapters b { display: block; }
+.chapters em { font-style: normal; display: block; font-size: 12px; color: var(--signal); }
+.script { font-size: 13px; line-height: 1.8; }
+.script p { margin: 0 0 6px; }
+.script .who { font-weight: 700; margin-right: 6px; }
+
+/* ---- overview ---- */
+.overview svg { width: 100%; height: auto; display: block; }
+.ov-wrap { overflow-x: auto; }
+.ov-text { fill: var(--ink); font-family: var(--font-sans); }
+.ov-muted { fill: var(--muted); font-family: var(--font-sans); }
+.ov-box { fill: var(--panel); stroke: var(--ink); stroke-width: 1.5; }
+.ov-dark { fill: var(--ink); }
+.ov-on-dark { fill: var(--panel); font-family: var(--font-sans); }
+.ov-line { stroke: var(--ink); stroke-width: 1.5; fill: none; }
+.ov-sig { fill: var(--signal-soft); stroke: var(--signal); stroke-width: 1.5; }
+.ov-sig-text { fill: var(--signal); font-family: var(--font-sans); }
+footer { font-size: 11px; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="33" fill="none" stroke="currentColor" stroke-width="6"/><circle cx="60" cy="60" r="20" fill="none" stroke="currentColor" stroke-width="5"/><circle cx="60" cy="60" r="9" fill="currentColor"/></svg>
+      <div><b>GEN³ WORKS</b><span>現場の勘を、次の担い手へ。</span></div>
+    </div>
+    <span class="sample">デモ用の架空データです</span>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="画面の切り替え">
+    <button role="tab" id="tab-glass" aria-selected="true" data-view="glass">① 作業者のグラス</button>
+    <button role="tab" id="tab-manager" aria-selected="false" data-view="manager">② 管理者への自動報告</button>
+    <button role="tab" id="tab-training" aria-selected="false" data-view="training">③ 教材（後から）</button>
+    <button role="tab" id="tab-overview" aria-selected="false" data-view="overview">全体像</button>
+  </nav>
+
+  <div class="ctrl">
+    <button class="primary" id="play">▶ 作業を再生</button>
+    <button id="next">1件進める</button>
+    <button id="reset">最初から</button>
+    <span class="clock" id="clock">09:00　待機中</span>
+    <span class="job">作業：66kV CVケーブル 中間接続（第3工区・マンホールNo.12）　作業者：若手A（経験1年）／遠隔：熟練者B</span>
+  </div>
+
+  <!-- ① glasses -->
+  <section id="view-glass" class="glass" aria-label="作業者のスマートグラス視界">
+    <div class="viewport">
+      <svg id="scene" viewBox="0 0 960 540" role="img" aria-label="ケーブル接続部の一人称視界。図面との照合結果が重ねて表示される"></svg>
+      <div class="hud-top"><span class="rec">REC 一人称動画・音声</span><span id="hud-step">手順 –/6</span><span id="hud-env">湿度 –%　気温 –℃</span></div>
+    </div>
+    <div class="side">
+      <h3>いまの手順</h3>
+      <div class="stepnow" id="g-step">再生を押すと作業が始まります</div>
+      <div id="g-alert" class="alert okay"><b>図面との照合</b>手順ごとに、図面の寸法と現物を照合します</div>
+      <div id="g-tip" class="tip"><b>熟練者の判断（過去の記録から）</b>該当する事例が出るとここに表示されます</div>
+      <h3>音声の記録（自動で文字に）</h3>
+      <div class="ticker" id="ticker" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ② manager -->
+  <section id="view-manager" class="grid2" hidden>
+    <div class="panel">
+      <h2>進捗（自動判定）</h2>
+      <p class="sub">会話と映像から、どの手順まで終わったかをAIが判定します。現場に行かなくても状況が分かります。</p>
+      <div class="progress" aria-hidden="true"><i id="m-bar"></i></div>
+      <ul class="steps" id="m-steps"></ul>
+      <div class="kpis">
+        <div><b id="k-photos">0</b><span>報告書に割り当てた写真</span></div>
+        <div><b id="k-flags">0</b><span>図面との差異</span></div>
+        <div><b>0分</b><span>作業者が報告書に使った時間</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>当日の作業記録報告書（自動作成）</h2>
+      <p class="sub">報告書の手順フローに沿って、映像から写真を抜き出して割り当てます。</p>
+      <div class="photos" id="m-photos"><p class="empty">写真はまだありません</p></div>
+      <div class="report" id="m-report">作業が始まると、ここに報告書の文面ができていきます。</div>
+    </div>
+  </section>
+
+  <!-- ③ training -->
+  <section id="view-training" class="grid2" hidden>
+    <div class="panel">
+      <h2>手順ごとの解説動画（自動で章立て）</h2>
+      <p class="sub">一人称動画を手順の切り替わりで区切り、AIが解説を付けます。当社の監修者が「勘どころ」を確認してから配信します。</p>
+      <ul class="chapters" id="t-chapters"></ul>
+    </div>
+    <div class="panel">
+      <h2>通勤中に聞く音声番組（台本）</h2>
+      <p class="sub">今日の記録から、勘どころを3分の番組にします。</p>
+      <div class="script" id="t-script"></div>
+    </div>
+  </section>
+
+  <!-- overview -->
+  <section id="view-overview" class="panel overview" hidden>
+    <h2>全体像：記録は自動、渡す先は三つ、その先にフィジカルAI</h2>
+    <div class="ov-wrap"><svg id="ov" viewBox="0 0 1000 420" role="img" aria-label="現場の作業者からスマートグラスで記録し、生成AIで整理して、若手・管理者・教材に渡し、蓄積したデータでフィジカルAIに学習させる流れ"></svg></div>
+  </section>
+
+  <footer>GEN³ Works（株式会社三現ワークス・事業構想）のデモ。寸法・事例・人物はすべて架空です。</footer>
+</div>
+
+<script>
+(function () {
+  const STEPS = [
+    { n: 1, name: "シース・遮へい層の剥ぎ取り", item: "1. 端末処理（剥ぎ取り寸法）", design: 450, unit: "mm", region: [120, 300] },
+    { n: 2, name: "外部半導電層の処理", item: "2. 外部半導電層の端部位置", design: 120, unit: "mm", region: [300, 420] },
+    { n: 3, name: "絶縁体表面の研磨・清掃", item: "3. 絶縁体表面の状態", design: null, unit: "", region: [420, 600] },
+    { n: 4, name: "導体の圧縮接続", item: "4. 圧縮回数・圧縮後寸法", design: 6, unit: "回", region: [600, 700] },
+    { n: 5, name: "接続ユニットの挿入", item: "5. ユニット挿入位置", design: 0, unit: "mm", region: [420, 760] },
+    { n: 6, name: "仕上げ・試験前確認", item: "6. 外観・試験前チェック", design: null, unit: "", region: [100, 860] },
+  ];
+  // timeline: what the glasses capture and what the AI does with it
+  const EVENTS = [
+    { t: "09:02", step: 1, who: "若手A", say: "シース、450で剥ぎ取ります", env: [72, 18] },
+    { t: "09:18", step: 1, who: "AI", say: "剥ぎ取り長 実測452mm（図面450mm・許容内）。写真を報告書1に割当", photo: { label: "剥ぎ取り長 452mm", ok: true }, measured: 452 },
+    { t: "09:31", step: 2, who: "若手A", say: "半導電層、ここまで処理しました", env: [74, 18] },
+    { t: "09:31", step: 2, who: "AI", say: "端部位置 実測112mm／図面120mm。8mm不足を検出", flag: "外部半導電層の端部が図面より8mm短い", measured: 112 },
+    { t: "09:33", step: 2, who: "熟練者B（遠隔）", say: "8ミリ足りないね。テープの位置から測り直して", tip: "端部はテープ基準で測る。目視の基準線は剥ぎ取り後にずれやすい（熟練者B・過去事例4件）" },
+    { t: "09:41", step: 2, who: "AI", say: "再処理後 120mm（図面どおり）。写真を報告書2に割当", photo: { label: "端部位置 120mm（再処理後）", ok: true }, measured: 120, resolved: true },
+    { t: "09:55", step: 3, who: "AI", say: "湿度78%を検知。過去の判断を表示", env: [78, 19], tip: "湿度75%以上の日は、絶縁体の清掃を2回に増やす（熟練者B・過去事例12件）" },
+    { t: "10:20", step: 3, who: "若手A", say: "清掃、2回目終わりました", photo: { label: "絶縁体表面 清掃2回", ok: true } },
+    { t: "10:48", step: 4, who: "AI", say: "圧縮6回を音と映像で確認（図面6回）。写真を報告書4に割当", photo: { label: "圧縮6回", ok: true }, measured: 6 },
+    { t: "11:30", step: 5, who: "若手A", say: "ユニット入れました。マーク合ってます", photo: { label: "挿入位置 マーク一致", ok: true }, measured: 0 },
+    { t: "12:05", step: 6, who: "AI", say: "全手順完了。報告書を作成し、現場代理人に送信", photo: { label: "仕上げ外観", ok: true }, done: true },
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  let idx = -1, timer = null;
+  const state = () => {
+    const seen = EVENTS.slice(0, idx + 1);
+    const last = seen[seen.length - 1];
+    const step = last ? last.step : 0;
+    const env = [...seen].reverse().find((e) => e.env)?.env;
+    const tip = [...seen].reverse().find((e) => e.tip && e.step === step)?.tip;
+    const flags = seen.filter((e) => e.flag);
+    const openFlag = flags.length && !seen.some((e) => e.resolved && e.step === flags[flags.length - 1].step) ? flags[flags.length - 1] : null;
+    const photos = seen.filter((e) => e.photo).map((e) => ({ ...e.photo, t: e.t, step: e.step }));
+    const measured = {};
+    seen.forEach((e) => { if (e.measured !== undefined) measured[e.step] = e.measured; });
+    const done = seen.some((e) => e.done);
+    return { seen, last, step, env, tip, flags, openFlag, photos, measured, done };
+  };
+
+  // ---------- glasses scene ----------
+  function scene(s) {
+    const step = s.step;
+    const reg = step ? STEPS[step - 1].region : null;
+    const m2 = s.measured[2];
+    const semiEnd = m2 === 112 ? 396 : 420;
+    const layers = `
+      <rect x="40" y="215" width="80" height="110" fill="#3a3f42"/>
+      <rect x="120" y="226" width="180" height="88" fill="#59605f"/>
+      <rect x="300" y="236" width="${semiEnd - 300}" height="68" fill="#2b2f31"/>
+      <rect x="${semiEnd}" y="240" width="${600 - semiEnd}" height="60" fill="#d8d6cc"/>
+      <rect x="600" y="256" width="100" height="28" fill="#c98b4b"/>
+      <rect x="700" y="240" width="${step >= 5 ? 0 : 120}" height="60" fill="#d8d6cc"/>
+      ${step >= 5 ? '<rect x="430" y="196" width="330" height="148" rx="14" fill="#6c7378" opacity=".92"/><text x="595" y="276" text-anchor="middle" font-size="18" fill="#e9ece8" font-family="Noto Sans JP, sans-serif">接続ユニット</text>' : ""}
+      <rect x="820" y="215" width="100" height="110" fill="#3a3f42"/>`;
+    const dims = `
+      <g font-family="IBM Plex Mono, monospace" font-size="15" fill="#8d948f">
+        <text x="210" y="208" text-anchor="middle">遮へい層</text>
+        <text x="${(300 + semiEnd) / 2}" y="350" text-anchor="middle">外部半導電層</text>
+        <text x="${(semiEnd + 600) / 2}" y="208" text-anchor="middle">絶縁体</text>
+        <text x="650" y="350" text-anchor="middle">導体</text>
+      </g>`;
+    // design line for the semicon end (from the drawing)
+    const drawing = step >= 2 ? `
+      <line x1="420" y1="180" x2="420" y2="370" stroke="#f2b45c" stroke-width="2" stroke-dasharray="6 5"/>
+      <text x="426" y="176" font-size="14" fill="#f2b45c" font-family="IBM Plex Mono, monospace">図面 120mm</text>` : "";
+    let hl = "";
+    if (reg) {
+      const warn = s.openFlag && s.openFlag.step === step;
+      const c = warn ? "#ff7b5c" : "#f2b45c";
+      hl = `<rect x="${reg[0]}" y="168" width="${reg[1] - reg[0]}" height="204" fill="none" stroke="${c}" stroke-width="3" rx="6"/>`;
+      if (warn) hl += `<g><rect x="250" y="400" width="300" height="56" rx="6" fill="#2a1712" stroke="#ff7b5c"/><text x="266" y="424" font-size="16" fill="#ff9d84" font-family="Noto Sans JP, sans-serif">差異：実測112mm／図面120mm</text><text x="266" y="446" font-size="14" fill="#e9ece8" font-family="Noto Sans JP, sans-serif">端部が8mm短い。測り直してください</text></g>`;
+    }
+    const tipBox = s.tip ? `<g><rect x="600" y="400" width="330" height="70" rx="6" fill="#16201a" stroke="#6fbf8b"/><text x="614" y="424" font-size="14" fill="#8fd3a6" font-family="Noto Sans JP, sans-serif">熟練者の判断</text><foreignObject x="612" y="428" width="310" height="40"><div xmlns="http://www.w3.org/1999/xhtml" style="font:13px/1.4 'Noto Sans JP',sans-serif;color:#e9ece8">${esc(s.tip.split("（")[0])}</div></foreignObject></g>` : "";
+    const hands = `<path d="M-20 540 C 60 430, 130 420, 190 440 L 230 470 L 200 540 Z" fill="#7a6a5c" opacity=".55"/><path d="M980 540 C 900 430, 830 425, 770 445 L 735 470 L 765 540 Z" fill="#7a6a5c" opacity=".55"/>`;
+    const done = s.done ? `<rect x="330" y="60" width="300" height="44" rx="6" fill="#16201a" stroke="#6fbf8b"/><text x="480" y="89" text-anchor="middle" font-size="17" fill="#8fd3a6" font-family="Noto Sans JP, sans-serif">全手順完了・報告書を送信</text>` : "";
+    $("scene").innerHTML = `<rect width="960" height="540" fill="transparent"/>${layers}${dims}${drawing}${hl}${tipBox}${hands}${done}`;
+  }
+
+  function esc(t) { return String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  function photoSvg(p, i) {
+    const ok = p.ok;
+    return `<svg viewBox="0 0 160 100" aria-hidden="true"><rect width="160" height="100" fill="#22272a"/>
+      <rect x="10" y="38" width="40" height="26" fill="#59605f"/><rect x="50" y="42" width="${30 + (i % 3) * 8}" height="18" fill="#2b2f31"/>
+      <rect x="${80 + (i % 3) * 8}" y="44" width="${50 - (i % 3) * 8}" height="14" fill="#d8d6cc"/><rect x="130" y="47" width="22" height="8" fill="#c98b4b"/>
+      <rect x="4" y="4" width="152" height="92" fill="none" stroke="${ok ? "#6fbf8b" : "#ff7b5c"}" stroke-width="2"/></svg>`;
+  }
+
+  // ---------- render ----------
+  function render() {
+    const s = state();
+    $("clock").textContent = s.last ? `${s.last.t}　${s.done ? "作業完了" : "作業中"}` : "09:00　待機中";
+    $("hud-step").textContent = s.step ? `手順 ${s.step}/6` : "手順 –/6";
+    $("hud-env").textContent = s.env ? `湿度 ${s.env[0]}%　気温 ${s.env[1]}℃` : "湿度 –%　気温 –℃";
+    $("g-step").textContent = s.step ? `${s.step}. ${STEPS[s.step - 1].name}` : "再生を押すと作業が始まります";
+    const ga = $("g-alert");
+    if (s.openFlag && s.openFlag.step === s.step) { ga.className = "alert"; ga.innerHTML = `<b>図面との差異</b>${esc(s.openFlag.flag)}`; }
+    else if (s.step) { ga.className = "alert okay"; ga.innerHTML = `<b>図面との照合</b>${s.done ? "全手順が図面・作業手順と一致" : "現在の手順は図面どおり"}`; }
+    $("g-tip").innerHTML = `<b>熟練者の判断（過去の記録から）</b>${s.tip ? esc(s.tip) : "該当する事例が出るとここに表示されます"}`;
+    $("ticker").innerHTML = s.seen.slice(-7).map((e, i, a) => `<div class="${i === a.length - 1 ? "new" : ""}">${e.t} ${esc(e.who)}：${esc(e.say)}</div>`).join("");
+    scene(s);
+
+    // manager
+    const doneSteps = s.done ? 6 : Math.max(0, s.step - 1);
+    $("m-bar").style.width = `${(doneSteps / 6) * 100}%`;
+    $("m-steps").innerHTML = STEPS.map((st) => {
+      const flagged = s.flags.some((f) => f.step === st.n);
+      let pill = '<span class="pill">未着手</span>';
+      if (s.done || st.n < s.step) pill = `<span class="pill done">完了${flagged ? "（差異→是正済）" : ""}</span>`;
+      else if (st.n === s.step) pill = s.openFlag && s.openFlag.step === st.n ? '<span class="pill flag">差異あり</span>' : '<span class="pill now">作業中</span>';
+      return `<li><span class="n">${st.n}</span><span>${esc(st.name)}</span>${pill}</li>`;
+    }).join("");
+    $("k-photos").textContent = s.photos.length;
+    $("k-flags").textContent = s.flags.length;
+    $("m-photos").innerHTML = s.photos.length ? s.photos.map((p, i) => `<div class="photo">${photoSvg(p, i)}<p>${esc(STEPS[p.step - 1].item)}<br><span>${p.t}</span> ${esc(p.label)}</p></div>`).join("") : '<p class="empty">写真はまだありません</p>';
+    if (!s.last) $("m-report").textContent = "作業が始まると、ここに報告書の文面ができていきます。";
+    else {
+      const lines = [`作業記録報告書（自動作成）  ${s.done ? "完了" : "作成中"}`, "工事：66kV CVケーブル 中間接続（第3工区・マンホールNo.12）", `環境：湿度${s.env ? s.env[0] : "-"}%・気温${s.env ? s.env[1] : "-"}℃`, ""];
+      STEPS.forEach((st) => {
+        if (!s.done && st.n > s.step) return;
+        const ph = s.photos.filter((p) => p.step === st.n).length;
+        const fl = s.flags.find((f) => f.step === st.n);
+        let mtxt = s.measured[st.n] !== undefined && st.design !== null ? `（図面${st.design}${st.unit}／実測${s.measured[st.n]}${st.unit}）` : "";
+        lines.push(`${st.item}${mtxt}　写真${ph}枚`);
+        if (fl) lines.push(`  ⚠ ${fl.flag} → 熟練者Bの指示で再処理、図面どおりに是正`);
+        if (st.n === 3 && s.seen.some((e) => e.step === 3 && e.photo)) lines.push("  湿度78%のため清掃を2回実施（過去の判断に基づく）");
+      });
+      $("m-report").innerHTML = lines.map((l) => (l.includes("⚠") ? `<span class="ng">${esc(l)}</span>` : esc(l))).join("\n");
+    }
+
+    // training
+    const chapters = [
+      ["00:00", "シース・遮へい層の剥ぎ取り", "剥ぎ取り長は図面値±の範囲で。測ってから切る"],
+      ["16:10", "外部半導電層の処理", "端部はテープ基準で測る。目視の基準線はずれやすい"],
+      ["53:00", "絶縁体表面の研磨・清掃", "湿度75%以上の日は清掃を2回に増やす"],
+      ["1:46:00", "導体の圧縮接続", "圧縮は6回。音で回数を確かめる"],
+      ["2:28:00", "接続ユニットの挿入", "マークを合わせてから押し込む"],
+      ["3:03:00", "仕上げ・試験前確認", "写真は手順ごとに1枚以上"],
+    ];
+    const upto = s.done ? 6 : s.step;
+    $("t-chapters").innerHTML = chapters.map((c, i) => i < upto ? `<li><span class="tc">${c[0]}</span><div><b>${i + 1}. ${esc(c[1])}</b><em>勘どころ：${esc(c[2])}</em></div></li>` : `<li><span class="tc">–</span><div><b style="color:var(--muted)">${i + 1}. ${esc(c[1])}</b><span class="empty">記録待ち</span></div></li>`).join("");
+    $("t-script").innerHTML = upto >= 3 ? [
+      ["案内役", "おはようございます。今日の勘どころは、ケーブル接続の外部半導電層と、湿度の高い日の清掃です。"],
+      ["案内役", "今朝の現場では、半導電層の端部が図面より8ミリ短くなっていました。熟練者のBさんの指摘は「テープの位置から測り直す」。目で見た線は、剥ぎ取ったあとにずれやすいからです。"],
+      ["案内役", "もう一つ。湿度が75%を超える日は、絶縁体の清掃を2回にします。これまでの記録12件で、Bさんは毎回そうしていました。"],
+      ["案内役", "明日の現場で、この2つを思い出してください。それでは、いってらっしゃい。"],
+    ].map(([w, t]) => `<p><span class="who">${w}</span>${esc(t)}</p>`).join("") : '<p class="empty">手順3まで記録されると、番組の台本ができます。</p>';
+  }
+
+  // ---------- overview diagram ----------
+  function overview() {
+    const box = (x, y, w, h, t, sub, dark) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" class="${dark ? "ov-dark" : "ov-box"}"/><text x="${x + w / 2}" y="${y + (sub ? h / 2 - 4 : h / 2 + 6)}" text-anchor="middle" font-size="16" font-weight="700" class="${dark ? "ov-on-dark" : "ov-text"}">${t}</text>${sub ? `<text x="${x + w / 2}" y="${y + h / 2 + 18}" text-anchor="middle" font-size="12.5" class="${dark ? "ov-on-dark" : "ov-muted"}">${sub}</text>` : ""}`;
+    const arrow = (x1, y1, x2, y2) => `<path d="M${x1} ${y1} L${x2} ${y2}" class="ov-line" marker-end="url(#ah)"/>`;
+    $("ov").innerHTML = `<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="ov-dark"/></marker></defs>
+      ${box(20, 150, 150, 80, "現場の作業者", "グラス・カメラ着用")}
+      ${arrow(170, 190, 225, 190)}
+      ${box(230, 140, 170, 100, "① 自動で記録", "一人称動画・会話", true)}
+      ${arrow(400, 190, 455, 190)}
+      ${box(460, 140, 170, 100, "② 整理する", "生成AI＋現場経験者", true)}
+      ${arrow(630, 175, 700, 70)}${arrow(630, 190, 700, 190)}${arrow(630, 205, 700, 310)}
+      ${box(705, 30, 270, 80, "若手へ（その場で）", "図面・手順を現物に重ね、差異を表示")}
+      ${box(705, 150, 270, 80, "管理者へ（自動報告）", "写真を抽出し、当日の報告書を作成")}
+      ${box(705, 270, 270, 80, "次の担い手へ（後から）", "解説動画・音声番組・研修資料")}
+      <rect x="230" y="300" width="400" height="90" rx="6" class="ov-sig"/>
+      <text x="430" y="336" text-anchor="middle" font-size="16" font-weight="700" class="ov-sig-text">③ 蓄積した作業データで AI が学ぶ</text>
+      <text x="430" y="362" text-anchor="middle" font-size="12.5" class="ov-muted">フィジカルAI：ロボット・検査AIへ手順を渡す（5年目〜）</text>
+      ${arrow(545, 240, 545, 298)}
+      <text x="535" y="275" text-anchor="end" font-size="12" class="ov-muted">記録が増えるほど賢くなる</text>`;
+  }
+
+  // ---------- controls ----------
+  function step() { if (idx < EVENTS.length - 1) { idx++; render(); } else stop(); }
+  function stop() { clearInterval(timer); timer = null; $("play").textContent = idx >= EVENTS.length - 1 ? "▶ もう一度再生" : "▶ 作業を再生"; }
+  $("play").addEventListener("click", () => {
+    if (timer) { stop(); return; }
+    if (idx >= EVENTS.length - 1) { idx = -1; render(); }
+    $("play").textContent = "❚❚ 一時停止";
+    step();
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    timer = setInterval(step, reduce ? 3200 : 2400);
+  });
+  $("next").addEventListener("click", () => { stop(); step(); });
+  $("reset").addEventListener("click", () => { stop(); idx = -1; render(); });
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("nav.tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+    ["glass", "manager", "training", "overview"].forEach((v) => { $("view-" + v).hidden = v !== b.dataset.view; });
+    try { localStorage.setItem("gen3-tab", b.dataset.view); } catch (e) {}
+  }));
+  const hashTab = location.hash.replace("#", "");
+  let saved = null; try { saved = localStorage.getItem("gen3-tab"); } catch (e) {}
+  const startTab = ["glass", "manager", "training", "overview"].includes(hashTab) ? hashTab : saved;
+  if (startTab) document.querySelector(`nav.tabs button[data-view="${startTab}"]`)?.click();
+
+  // open in a realistic working state: mid-job, with the deviation on screen
+  idx = 3;
+  overview();
+  render();
+})();
+</script>
