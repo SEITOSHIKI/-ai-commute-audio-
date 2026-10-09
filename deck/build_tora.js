@@ -456,7 +456,7 @@ async function main() {
     txt(s, [run("━ 実際の売上", { bold: true }), run("　┅ 損益分岐点売上（百万円）", { color: K.gray700 })], { x: gx, y: top, w: gw, h: 0.26, size: 8.5, valign: "middle" });
     s.addChart([
       { type: pres.charts.LINE, data: [{ name: "売上高", labels: years, values: [12, 48, 110, 190, 290] }], options: { chartColors: [K.ink], lineSize: 3, lineDataSymbol: "circle", lineDataSymbolSize: 6, showValue: true, dataLabelPosition: "b" } },
-      { type: pres.charts.LINE, data: [{ name: "損益分岐点売上", labels: years, values: [89, 93, 119, 151, 196] }], options: { chartColors: [K.gray500], lineSize: 2, lineDash: "dash", lineDataSymbol: "diamond", lineDataSymbolSize: 6, showValue: true, dataLabelPosition: "t" } },
+      { type: pres.charts.LINE, data: [{ name: "損益分岐点売上", labels: years, values: [92, 92, 120, 151, 196] }], options: { chartColors: [K.gray500], lineSize: 2, lineDash: "dash", lineDataSymbol: "diamond", lineDataSymbolSize: 6, showValue: true, dataLabelPosition: "t" } },
     ], { x: gx, y: top + 0.28, w: gw, h: 3.3, catAxisLabelColor: K.gray700, valAxisLabelColor: K.gray700, catAxisLabelFontSize: 9, valAxisLabelFontSize: 8,
       catAxisLabelFontFace: "+mn-lt", valAxisLabelFontFace: "+mn-lt", valGridLine: { color: K.rule, size: 0.5 }, catGridLine: { style: "none" },
       valAxisMinVal: 0, valAxisMaxVal: 300, valAxisMajorUnit: 50, valAxisLineShow: false, showLegend: false,
@@ -466,7 +466,7 @@ async function main() {
       ["百万円", "3年目", "4年目", "5年目"],
       ["販管費（固定費）", "79", "107", "144"],
       ["粗利率", "66%", "71%", "73%"],
-      ["損益分岐点売上", "119", "151", "196"],
+      ["損益分岐点売上", "120", "151", "196"],
       ["実際の売上", "110", "190", "290"],
       ["安全余裕率", "─", "21%", "32%"],
     ], { x: rx, y: top, w: rw, colW: [1.5, 0.75, 0.75, 0.75], rowH: 0.32, size: 8.5, strongRows: [3], name: "bep-table" });
@@ -477,7 +477,7 @@ async function main() {
       run("＝ 社員1人あたり2.8拠点", { bold: true, breakLine: true }),
       run("3年目 2.73（未達）→ 4年目 3.67（超過）"),
     ], { x: rx + 0.15, y: top + 2.3, w: rw - 0.3, h: 1.25, size: 9, color: K.paper, psa: 2 });
-    txt(s, "安全余裕率＝（売上−損益分岐点売上）÷売上。1〜2年目の損益分岐点売上は89・93百万円（売上12・48百万円）", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
+    txt(s, "安全余裕率＝（売上−損益分岐点売上）÷売上。1〜2年目の損益分岐点売上は92・92百万円（売上12・48百万円）", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
 
   // ---------- Slide 10 資金計画・黒字倒産対策 ----------
@@ -500,7 +500,7 @@ async function main() {
     txt(s, [run("━ 現金残高", { bold: true }), run("　┅ 最低残高（固定費3か月分）", { color: K.gray700 })], { x: rx + 1.6, y: top, w: rw - 1.6, h: 0.26, size: 8, align: "right", valign: "middle" });
     const lab = ["準備期", "1年目", "2年目", "3年目", "4年目", "5年目"];
     s.addChart([
-      { type: pres.charts.LINE, data: [{ name: "現金残高", labels: lab, values: [0, 93, 66, 60, 88, 157] }], options: { chartColors: [K.ink], lineSize: 3, lineDataSymbol: "circle", lineDataSymbolSize: 6, showValue: true } },
+      { type: pres.charts.LINE, data: [{ name: "現金残高", labels: lab, values: [0, 93, 66, 60, 88, 156] }], options: { chartColors: [K.ink], lineSize: 3, lineDataSymbol: "circle", lineDataSymbolSize: 6, showValue: true } },
       { type: pres.charts.LINE, data: [{ name: "最低残高", labels: lab, values: [20, 20, 20, 20, 20, 20] }], options: { chartColors: [K.gray500], lineSize: 1.5, lineDash: "dash", lineDataSymbol: "none", showValue: false } },
     ], { x: rx, y: top + 0.28, w: rw, h: 2.2, catAxisLabelColor: K.gray700, valAxisLabelColor: K.gray700, catAxisLabelFontSize: 8.5, valAxisLabelFontSize: 8,
       catAxisLabelFontFace: "+mn-lt", valAxisLabelFontFace: "+mn-lt", valGridLine: { color: K.rule, size: 0.5 }, catGridLine: { style: "none" },
