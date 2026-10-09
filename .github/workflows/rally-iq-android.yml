@@ -13,6 +13,10 @@ on:
       - ".github/workflows/rally-iq-android.yml"
     tags:
       - "rally-iq-v*"
+  pull_request:
+    paths:
+      - "games/badminton/**"
+      - ".github/workflows/rally-iq-android.yml"
 
 permissions:
   contents: write
