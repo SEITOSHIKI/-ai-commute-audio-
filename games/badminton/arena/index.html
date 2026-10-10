@@ -1,0 +1,286 @@
+<title>ラリーIQ アリーナ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: 夜のアリーナを真横から映す対戦画面。HUD は四隅とスコア帯だけ、中央はコートとシャトルに明け渡す。
+   単一テーマ（照明の落ちた体育館）を意図的に採用。 */
+:root {
+  color-scheme: dark;
+  --arena: #0b1416;
+  --panel: rgba(11, 20, 22, 0.78);
+  --ink: #eef3ee;
+  --muted: #8ea39a;
+  --rule: rgba(142, 163, 154, 0.28);
+  --you: #f4b63f;
+  --cpu: #ee6c5a;
+  --best: #5fd6a2;
+  --good: #8cc6e8;
+  --ok: #d8c86a;
+  --bad: #ee6c5a;
+  --font-display: "Saira Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--arena);
+  color: var(--ink);
+  font-family: var(--font-body);
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+#view { position: fixed; inset: 0; }
+#view canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+/* ---- HUD ---- */
+.hud { position: fixed; inset: 0; pointer-events: none; padding-inline: 16px; padding-block: max(10px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-bottom, 0px)); }
+.score {
+  position: absolute; top: max(10px, env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px;
+  font-family: var(--font-display); font-weight: 800; font-style: italic;
+}
+.score .pts { font-size: 2.6rem; line-height: 1; font-variant-numeric: tabular-nums; min-width: 1.3ch; text-align: center; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5); }
+.score .who { font-size: 0.9rem; letter-spacing: 0.12em; }
+.score .you { color: var(--you); }
+.score .cpu { color: var(--cpu); }
+.score .dash { color: var(--muted); font-size: 1.6rem; }
+.srv { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); visibility: hidden; align-self: center; }
+.srv.on { visibility: visible; }
+.meta { position: absolute; top: calc(max(10px, env(safe-area-inset-top, 0px)) + 46px); left: 50%; transform: translateX(-50%); font-family: var(--font-display); letter-spacing: 0.16em; font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+
+.face {
+  position: absolute; top: max(10px, env(safe-area-inset-top, 0px)); left: 16px;
+  display: flex; flex-direction: column; gap: 4px; min-width: 132px;
+}
+.label { font-family: var(--font-display); letter-spacing: 0.16em; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; }
+.notches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+.notches i { height: 8px; border-radius: 2px; background: var(--rule); }
+.notches i.on { background: var(--you); }
+.notches i.mid.on { background: var(--ink); }
+.face strong { font-size: 0.95rem; font-weight: 700; }
+.zone { margin-top: 6px; }
+.bar { height: 6px; border-radius: 3px; background: var(--rule); overflow: hidden; }
+.bar span { display: block; height: 100%; width: 0%; background: var(--good); transition: width 0.2s; }
+.bar.full span { background: var(--best); }
+
+.shotcard {
+  position: absolute; top: max(10px, env(safe-area-inset-top, 0px)); right: 16px;
+  text-align: right; max-width: 46vw; display: flex; flex-direction: column; gap: 2px;
+}
+.shotcard .name { font-family: var(--font-display); font-weight: 800; font-style: italic; font-size: 1.5rem; line-height: 1; }
+.shotcard .nums { font-family: var(--font-display); font-size: 0.95rem; font-variant-numeric: tabular-nums; color: var(--ink); }
+.shotcard .eval { font-size: 0.82rem; }
+.r-ace { color: var(--best); } .r-hard { color: var(--good); } .r-ok { color: var(--ok); } .r-soft, .r-err { color: var(--bad); }
+
+.aim {
+  position: absolute; left: 50%; bottom: calc(max(10px, env(safe-area-inset-bottom, 0px)) + 8px); transform: translateX(-50%);
+  background: var(--panel); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 6px 12px; font-family: var(--font-display); font-size: 1.05rem; font-variant-numeric: tabular-nums;
+  white-space: nowrap; display: flex; gap: 14px; align-items: baseline;
+}
+.aim b { color: var(--you); font-weight: 700; }
+.aim small { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.1em; }
+.hint {
+  position: absolute; left: 50%; bottom: calc(max(10px, env(safe-area-inset-bottom, 0px)) + 8px); transform: translateX(-50%);
+  font-size: 0.82rem; color: var(--muted); white-space: nowrap; text-align: center;
+}
+.hint kbd { font-family: var(--font-display); border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 3px; padding: 0 5px; color: var(--ink); }
+
+.banner {
+  position: absolute; left: 0; right: 0; top: 38%;
+  text-align: center; font-family: var(--font-display); font-weight: 800; font-style: italic;
+  font-size: clamp(3rem, 12vw, 7rem); line-height: 1; letter-spacing: 0.02em;
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.55);
+  animation: pop 0.32s cubic-bezier(.2, 1.6, .4, 1);
+}
+.banner small { display: block; font-family: var(--font-body); font-style: normal; font-weight: 700; font-size: clamp(0.9rem, 3vw, 1.2rem); color: var(--ink); margin-top: 8px; letter-spacing: 0; text-shadow: none; }
+@keyframes pop { from { transform: scale(1.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* ---- タッチ操作 ---- */
+.touch { position: fixed; inset: 0; pointer-events: none; }
+.stick {
+  position: absolute; left: max(18px, env(safe-area-inset-left, 0px)); bottom: calc(max(18px, env(safe-area-inset-bottom, 0px)) + 4px);
+  width: 128px; height: 128px; border-radius: 50%;
+  border: 2px solid var(--rule); background: rgba(11, 20, 22, 0.35);
+}
+.stick i { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; background: rgba(238, 243, 238, 0.22); border: 2px solid rgba(238, 243, 238, 0.5); }
+.stick span { position: absolute; top: -20px; left: 0; right: 0; text-align: center; font-size: 0.68rem; color: var(--muted); }
+.btns {
+  position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(max(18px, env(safe-area-inset-bottom, 0px)) + 4px);
+  display: grid; grid-template-columns: repeat(2, 58px); gap: 8px; pointer-events: auto;
+}
+.btns button {
+  width: 58px; height: 58px; border-radius: 50%;
+  border: 2px solid var(--rule); background: rgba(11, 20, 22, 0.55); color: var(--ink);
+  font: 700 0.78rem var(--font-body); touch-action: none;
+}
+.btns button:active { background: rgba(244, 182, 63, 0.3); }
+.btns .zone-btn.ready { border-color: var(--best); color: var(--best); }
+
+/* ---- メニュー ---- */
+.overlay { position: fixed; inset: 0; display: flex; overflow: auto; background: rgba(11, 20, 22, 0.86); backdrop-filter: blur(4px); z-index: 5; pointer-events: auto; }
+.card { margin: auto; width: min(560px, 100%); box-sizing: border-box; padding-inline: 20px; padding-block: 24px; display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font-family: var(--font-display); letter-spacing: 0.24em; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; }
+h1 { margin: 2px 0 0; font-family: var(--font-display); font-weight: 800; font-style: italic; font-size: clamp(2.8rem, 11vw, 4.6rem); line-height: 0.9; }
+h1 em { color: var(--you); }
+.lead { margin: 8px 0 0; color: var(--muted); font-size: 0.88rem; line-height: 1.7; text-wrap: pretty; }
+.group { display: flex; flex-direction: column; gap: 6px; }
+.group > span { font-family: var(--font-display); font-size: 0.75rem; letter-spacing: 0.16em; color: var(--muted); text-transform: uppercase; }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.seg.two { grid-template-columns: repeat(2, 1fr); }
+.opt { position: relative; }
+.opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.opt label { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 8px 4px; border: 1px solid var(--rule); border-radius: 4px; font-size: 0.85rem; font-weight: 700; cursor: pointer; text-align: center; }
+.opt label small { font-weight: 400; color: var(--muted); font-size: 0.68rem; }
+.opt input:checked + label { border-color: var(--you); background: rgba(244, 182, 63, 0.14); }
+.opt input:focus-visible + label, button:focus-visible { outline: 2px solid var(--you); outline-offset: 2px; }
+.how { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 0.84rem; line-height: 1.6; margin: 0; }
+.how dt { font-family: var(--font-display); font-weight: 700; color: var(--you); letter-spacing: 0.06em; white-space: nowrap; }
+.how dd { margin: 0; }
+.kbd-hint { font-family: var(--font-display); font-weight: 700; color: var(--ink); }
+.cta { font: 800 1.15rem var(--font-display); letter-spacing: 0.14em; text-transform: uppercase; padding: 12px; color: var(--arena); background: var(--you); border: 0; border-radius: 4px; cursor: pointer; }
+.ghost { font: 500 0.85rem var(--font-body); color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 4px; padding: 10px; cursor: pointer; }
+.row { display: flex; gap: 8px; }
+.row > * { flex: 1; }
+.result h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-style: italic; font-size: 3.4rem; line-height: 1; }
+.final { font-family: var(--font-display); font-size: 1.3rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; border-block: 1px solid var(--rule); padding-block: 12px; }
+.stats div { display: flex; flex-direction: column; min-width: 0; }
+.stats span { font-size: 0.72rem; color: var(--muted); }
+.stats strong { font-family: var(--font-display); font-size: 1.45rem; font-variant-numeric: tabular-nums; }
+.advice { margin: 0; font-size: 0.86rem; line-height: 1.7; }
+.advice b { color: var(--you); }
+.rotate { font-size: 0.78rem; color: var(--muted); text-align: center; }
+@media (orientation: landscape) { .rotate { display: none; } }
+@media (max-height: 460px) {
+  .score .pts { font-size: 2rem; }
+  .shotcard .name { font-size: 1.2rem; }
+  .stick { width: 110px; height: 110px; }
+}
+@media (max-width: 600px) {
+  .face { top: calc(max(10px, env(safe-area-inset-top, 0px)) + 66px); min-width: 110px; }
+  .shotcard { top: calc(max(10px, env(safe-area-inset-top, 0px)) + 66px); }
+  .score .pts { font-size: 2.1rem; }
+  .meta { top: calc(max(10px, env(safe-area-inset-top, 0px)) + 38px); }
+  .hint, .aim { bottom: calc(max(18px, env(safe-area-inset-bottom, 0px)) + 150px); white-space: normal; width: max-content; max-width: calc(100% - 32px); text-align: center; }
+  .aim { flex-wrap: wrap; justify-content: center; gap: 4px 12px; }
+}
+@media (max-height: 460px) {
+  h1 { font-size: 2.6rem; }
+  .card { gap: 10px; padding-block: 14px; }
+  .how { font-size: 0.78rem; }
+}
+@media (prefers-reduced-motion: reduce) { .banner { animation: none; } }
+</style>
+
+<div id="view"></div>
+
+<div class="hud" id="hud">
+  <div class="face" aria-label="ラケット面">
+    <span class="label">Racket face · 面</span>
+    <div class="notches" id="notches"><i></i><i></i><i class="mid"></i><i></i><i></i></div>
+    <strong id="faceName">フラット</strong>
+    <div class="zone">
+      <span class="label">Zone · 集中</span>
+      <div class="bar" id="zoneBar"><span></span></div>
+    </div>
+  </div>
+  <div class="score" aria-live="polite">
+    <span class="who you">YOU</span><span class="srv" id="srvP"></span>
+    <span class="pts you" id="ptsP">0</span><span class="dash">–</span><span class="pts cpu" id="ptsO">0</span>
+    <span class="srv" id="srvO"></span><span class="who cpu">CPU</span>
+  </div>
+  <div class="meta" id="meta">部活 · RALLY 0</div>
+  <div class="shotcard" id="shotcard" hidden>
+    <span class="name" id="scName"></span>
+    <span class="nums" id="scNums"></span>
+    <span class="eval" id="scEval"></span>
+  </div>
+  <div class="aim" id="aim" hidden>
+    <span><small>角度</small> <b id="aElev">0°</b></span>
+    <span><small>初速</small> <b id="aSpeed">0</b>km/h</span>
+    <span><small>コース</small> <b id="aYaw">ストレート</b></span>
+    <span><small>着地</small> <b id="aLand">—</b></span>
+  </div>
+  <div class="hint" id="hint"></div>
+  <div class="banner" id="banner" hidden></div>
+</div>
+
+<div class="touch" id="touch" hidden>
+  <div class="stick" id="stick"><span id="stickLabel">コース</span><i id="knob"></i></div>
+  <div class="btns">
+    <button type="button" id="bFaceL" aria-label="面をリバース側へ">面◀</button>
+    <button type="button" id="bFaceR" aria-label="面をカット側へ">面▶</button>
+    <button type="button" id="bZone" class="zone-btn" aria-label="集中ゾーン">集中</button>
+    <button type="button" id="bJump" aria-label="ジャンプ">跳</button>
+  </div>
+</div>
+
+<div class="overlay" id="titleScreen">
+  <div class="card">
+    <div>
+      <div class="eyebrow">Badminton singles · 3D battle</div>
+      <h1>ラリーIQ <em>ARENA</em></h1>
+      <p class="lead">角度・コース・初速・ラケット面。シャトルが届くまでに4つを決めて打つ、本物の空気抵抗で飛ぶバドミントン対戦。決めるのが早すぎると読まれ、遅すぎると甘くなる。</p>
+    </div>
+    <div class="group" role="radiogroup" aria-label="難易度">
+      <span>難易度</span>
+      <div class="seg">
+        <div class="opt"><input type="radio" name="lv" id="lv-beginner" value="beginner"><label for="lv-beginner">入門<small>弾道ガイドあり</small></label></div>
+        <div class="opt"><input type="radio" name="lv" id="lv-club" value="club" checked><label for="lv-club">部活<small>ガイド6割</small></label></div>
+        <div class="opt"><input type="radio" name="lv" id="lv-expert" value="expert"><label for="lv-expert">実業団<small>ガイド短め</small></label></div>
+        <div class="opt"><input type="radio" name="lv" id="lv-pro" value="pro"><label for="lv-pro">代表<small>ほぼ実速</small></label></div>
+      </div>
+    </div>
+    <div class="group" role="radiogroup" aria-label="フットワーク">
+      <span>フットワーク</span>
+      <div class="seg two">
+        <div class="opt"><input type="radio" name="mv" id="mv-auto" value="auto" checked><label for="mv-auto">オート<small>配球の判断に集中</small></label></div>
+        <div class="opt"><input type="radio" name="mv" id="mv-manual" value="manual"><label for="mv-manual">マニュアル<small>移動も自分で</small></label></div>
+      </div>
+    </div>
+    <div class="group" role="radiogroup" aria-label="形式">
+      <span>形式</span>
+      <div class="seg two">
+        <div class="opt"><input type="radio" name="len" id="len-11" value="11" checked><label for="len-11">11点<small>最大15</small></label></div>
+        <div class="opt"><input type="radio" name="len" id="len-21" value="21"><label for="len-21">21点<small>最大30</small></label></div>
+      </div>
+    </div>
+    <dl class="how">
+      <dt>ドラッグ</dt><dd>向き＝打ち出し角度（上でクリアー、下でスマッシュ）、長さ＝初速。指を離すと配球を予約。</dd>
+      <dt>コース</dt><dd>離す瞬間の <span class="kbd-hint">W / S</span>・スティックの上下で、奥側（クロス）／手前側。</dd>
+      <dt>面</dt><dd><span class="kbd-hint">Q / E</span>・ホイール・面ボタン。カットは遅く曲がって短く落ち、相手の反応を遅らせる。</dd>
+      <dt>ジャンプ</dt><dd><span class="kbd-hint">Space</span>。高い打点から急角度のジャンピングスマッシュ。</dd>
+      <dt>集中</dt><dd>ゲージが満タンで <span class="kbd-hint">Shift</span>。3秒間スローになる。</dd>
+    </dl>
+    <button class="cta" id="startBtn" type="button">Start · 試合開始</button>
+    <div class="rotate">スマホは横向きがおすすめ</div>
+  </div>
+</div>
+
+<div class="overlay" id="resultScreen" hidden>
+  <div class="card result">
+    <div>
+      <h2 id="resTitle">WIN</h2>
+      <div class="final" id="resScore">11 – 7</div>
+    </div>
+    <div class="stats">
+      <div><span>最速スマッシュ</span><strong id="rsSmash">—</strong></div>
+      <div><span>エース</span><strong id="rsAce">0</strong></div>
+      <div><span>自分のミス</span><strong id="rsErr">0</strong></div>
+      <div><span>平均判断</span><strong id="rsTime">—</strong></div>
+      <div><span>相手の余裕（平均）</span><strong id="rsMargin">—</strong></div>
+      <div><span>判断遅れ</span><strong id="rsLate">0</strong></div>
+    </div>
+    <p class="advice" id="rsAdvice"></p>
+    <div class="row">
+      <button class="ghost" id="menuBtn" type="button">設定を変える</button>
+      <button class="cta" id="againBtn" type="button">Rematch</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="game.js"></script>

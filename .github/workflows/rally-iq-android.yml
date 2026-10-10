@@ -73,6 +73,9 @@ jobs:
       - name: Balance check (CPU vs CPU)
         run: node sim-test.js | head -1
 
+      - name: Arena match logic check (scripted human)
+        run: node arena/sim-human.js
+
       - name: Build web and sync to Android
         run: |
           npm run build
