@@ -107,7 +107,7 @@ const arenaHtml = wrap(arenaSrc, '<div id="view">', '', b => b.replace(
   '<div class="rotate">',
   '<a class="ghost" href="drill/" style="text-align:center;text-decoration:none">2D 配球ドリル（ゾーンを選ぶだけの判断練習）</a>\n    <div class="rotate">'));
 await writeFile(path.join(out, 'index.html'), arenaHtml);
-for (const f of ['game.js', 'physics.js', 'match.js']) await cp(path.join(root, 'arena', f), path.join(out, f));
+for (const f of ['game.js', 'physics.js', 'match.js', 'roster.js']) await cp(path.join(root, 'arena', f), path.join(out, f));
 await cp(path.join(root, 'arena', 'vendor'), path.join(out, 'vendor'), { recursive: true });
 
 // 2D ドリル
@@ -144,7 +144,7 @@ const manifest = {
 await writeFile(path.join(out, 'manifest.webmanifest'), JSON.stringify(manifest, null, 2));
 
 // フォント（数百の分割ファイル）は初回に全部は取らず、使われた分だけ実行時にキャッシュする
-const precache = ['./', 'index.html', 'game.js', 'physics.js', 'match.js', 'vendor/three.module.js', 'vendor/three.core.js',
+const precache = ['./', 'index.html', 'game.js', 'physics.js', 'match.js', 'roster.js', 'vendor/three.module.js', 'vendor/three.core.js',
   'drill/', 'drill/index.html', 'drill/engine.js', 'privacy.html', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
   ...(fontsBundled ? ['fonts/fonts.css'] : [])];

@@ -31,6 +31,18 @@ export const C = {
 };
 
 const K_DRAG = C.G / (C.VT * C.VT);
+
+/**
+ * 選手の能力（roster.js の能力値から作る）。未指定なら標準的な選手。
+ * speed/acc: フットワーク, reach/reachTop: 水平リーチと最高到達点（身長由来）, jumpV: ジャンプ初速,
+ * vOver/vSide/vUnder: 打点別の最高初速（パワー）, noise: 打球のブレ倍率（コントロール）,
+ * sliceK: 面の効き（テクニック）, deceive: カットで相手の反応を遅らせる秒数, defense: 速い球を受ける上手さ,
+ * react: 反応時間の倍率（反応）
+ */
+export const DEF_ATTR = {
+  speed: 4.6, acc: 26, reach: 1.05, reachTop: 2.55, jumpV: 3.1,
+  vOver: 86, vSide: 56, vUnder: 42, noise: 1, sliceK: 1, deceive: 0.06, defense: 0.5, react: 1, lefty: false,
+};
 const deg = d => d * Math.PI / 180;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -108,10 +120,10 @@ export function landsIn(p, side, serve) {
 // ---------------- ショット ----------------
 
 // 打点の高さで打てる角度と最高初速が決まる
-export function contactBand(h, jumping) {
-  if (h >= 2.0) return { name: 'over', minE: -38, maxE: 62, vmax: jumping ? 98 : 86 };
-  if (h >= 1.1) return { name: 'side', minE: -16, maxE: 55, vmax: 56 };
-  return { name: 'under', minE: -6, maxE: 72, vmax: 42 };
+export function contactBand(h, jumping, attr = DEF_ATTR) {
+  if (h >= 2.0) return { name: 'over', minE: -38, maxE: 62, vmax: attr.vOver * (jumping ? 1.12 : 1) };
+  if (h >= 1.1) return { name: 'side', minE: -16, maxE: 55, vmax: attr.vSide };
+  return { name: 'under', minE: -6, maxE: 72, vmax: attr.vUnder };
 }
 
 /**
@@ -120,15 +132,22 @@ export function contactBand(h, jumping) {
  * side: 打つ方向（+1 / -1）, q: 打点の質（0..1）, rng があれば質に応じてブレる
  */
 export function launch(contact, side, aim, q, opts = {}) {
-  const band = opts.serve ? { name: 'serve', minE: -4, maxE: 62, vmax: 34 } : contactBand(contact.y, opts.jumping);
+  const attr = opts.attr || DEF_ATTR;
+  const band = opts.serve ? { name: 'serve', minE: -4, maxE: 62, vmax: 34 } : contactBand(contact.y, opts.jumping, attr);
   const rng = opts.rng;
   const noise = (sd) => rng ? (rng() + rng() + rng() - 1.5) * 2 * sd : 0;
-  const errScale = (1 - q) + (opts.noise || 0) + Math.abs(aim.slice) * 0.15;
+  const errScale = ((1 - q) + (opts.noise || 0) + Math.abs(aim.slice) * 0.15) * attr.noise;
   const elev = clamp(aim.elev, band.minE, band.maxE) + noise(6 * errScale);
-  const yaw = clamp(aim.yaw, -1, 1) * 21 + noise(4 * errScale);
+  // 方向: dir（水平ベクトル）指定か、yaw（-1..1）指定
+  const baseYaw = aim.dir ? Math.atan2(aim.dir.z, aim.dir.x * side) * 180 / Math.PI : clamp(aim.yaw, -1, 1) * 21;
+  const yaw = baseYaw + noise(4 * errScale);
   const vmin = 3.2;
-  let speed = lerp(vmin, band.vmax, clamp(aim.power, 0, 1));
-  speed *= (1 - C.SLICE_SPEED_LOSS * Math.abs(aim.slice)) * (0.78 + 0.22 * q);
+  let speed;
+  if (aim.speed != null) speed = Math.min(aim.speed, band.vmax) * (0.86 + 0.14 * q);
+  else {
+    speed = lerp(vmin, band.vmax, clamp(aim.power, 0, 1));
+    speed *= (1 - C.SLICE_SPEED_LOSS * Math.abs(aim.slice)) * (0.78 + 0.22 * q);
+  }
   speed *= 1 + noise(0.05 * errScale);
   const e = deg(elev), y = deg(yaw);
   const v = {
@@ -138,10 +157,83 @@ export function launch(contact, side, aim, q, opts = {}) {
   };
   // ネット前の低速スライス（スピンネット）は回転して返しにくい
   const nearNet = Math.abs(contact.x) < 2.4 && speed < 16;
-  const tumble = nearNet && Math.abs(aim.slice) > 0.2 ? 0.7 * Math.abs(aim.slice) : 0;
-  const s = makeShuttle(contact, v, aim.slice * side, tumble);
+  const tumble = nearNet && Math.abs(aim.slice) > 0.2 ? 0.7 * Math.abs(aim.slice) * attr.sliceK : 0;
+  const s = makeShuttle(contact, v, aim.slice * side * attr.sliceK, tumble);
   return { shuttle: s, band, elev, yaw, speed };
 }
+
+/**
+ * 狙った着地点 target と弾道の高さ hclass から、打ち出し角度・方向・初速を逆算する。
+ * hclass: 'down'（沈める）| 'flat'（低く速く）| 'mid'（ふつう）| 'high'（高く）
+ * 打点から実現できなければ一段高い弾道に切り替え、downgraded に記録する。
+ */
+const HCLASS_ELEVS = {
+  high: [58, 52, 46, 40, 34],
+  mid: [20, 15, 25, 11, 30, 7],
+  flat: [4, 7, 1, 10, -2, 13],
+  down: [-36, -32, -28, -24, -20, -17, -14, -11, -9, -7, -5, -3, -1],
+};
+const HCLASS_NEXT = { down: 'flat', flat: 'mid', mid: 'high', high: null };
+
+export function solveShot(contact, side, target, hclass, slice, opts = {}) {
+  const attr = opts.attr || DEF_ATTR;
+  const band = opts.serve ? { name: 'serve', minE: -4, maxE: 62, vmax: 34 } : contactBand(contact.y, opts.jumping, attr);
+  const vmax = band.vmax * (1 - C.SLICE_SPEED_LOSS * Math.abs(slice) * 0.6);
+  let cls = hclass, downgraded = null;
+  while (cls) {
+    const r = trySolve(contact, side, target, cls, slice, band, vmax, attr, opts.serve);
+    if (r) return { ...r, hclass: cls, downgraded, band };
+    downgraded = downgraded || hclass;
+    cls = HCLASS_NEXT[cls];
+  }
+  // どの弾道でも届かない: 高く遠くへ逃げる
+  return { aim: { elev: 45, dir: dirTo(contact, target), speed: vmax, slice }, hclass: 'high', downgraded: hclass, band, fail: true };
+}
+
+function dirTo(c, t) {
+  const dx = t.x - c.x, dz = t.z - c.z, d = Math.hypot(dx, dz) || 1;
+  return { x: dx / d, z: dz / d };
+}
+
+function trySolve(contact, side, target, cls, slice, band, vmax, attr, serve) {
+  const dist = hyp2(target.x - contact.x, target.z - contact.z);
+  for (const elev of HCLASS_ELEVS[cls]) {
+    if (elev < band.minE || elev > band.maxE) continue;
+    let dir = dirTo(contact, target);
+    let lo = 2.5, hi = vmax, sim = null, speed = 0;
+    for (let pass = 0; pass < 2; pass++) {
+      // 届く速さがあるか
+      const far = fly(contact, side, elev, dir, hi, slice, attr);
+      if (far.end !== 'land' || alongDist(contact, far.p, dir) < dist - 0.05) { sim = null; break; }
+      lo = 2.5; let h = hi;
+      for (let i = 0; i < 11; i++) {
+        const mid = (lo + h) / 2;
+        const s2 = fly(contact, side, elev, dir, mid, slice, attr);
+        const d2 = s2.end === 'land' ? alongDist(contact, s2.p, dir) : -1;
+        if (d2 < dist) lo = mid; else h = mid;
+      }
+      speed = h;
+      sim = fly(contact, side, elev, dir, speed, slice, attr);
+      if (sim.end !== 'land') { sim = null; break; }
+      // スライスの曲がりを打ち消すよう方向を補正
+      const ex = target.x - sim.p.x, ez = target.z - sim.p.z;
+      if (Math.hypot(ex, ez) < 0.12) break;
+      dir = dirTo(contact, { x: target.x + ex, z: target.z + ez });
+    }
+    if (!sim) continue;
+    if (sim.clearance != null && sim.clearance < 0.06) continue; // ネットすれすれ以下は不可
+    if (Math.hypot(sim.p.x - target.x, sim.p.z - target.z) > 0.5) continue;
+    return { aim: { elev, dir, speed, slice }, sim };
+  }
+  return null;
+}
+
+function fly(contact, side, elev, dir, speed, slice, attr) {
+  const e = deg(elev);
+  const v = { x: dir.x * Math.cos(e) * speed, y: Math.sin(e) * speed, z: dir.z * Math.cos(e) * speed };
+  return simulate(makeShuttle(contact, v, slice * side * attr.sliceK), { dt: 1 / 120, every: 6 });
+}
+function alongDist(c, p, dir) { return (p.x - c.x) * dir.x + (p.z - c.z) * dir.z; }
 
 /**
  * 予約した「狙い（着地点と強さ）」を、実際の打点から再現できる角度に合わせ直す。
@@ -183,12 +275,12 @@ export function nameShot(contact, side, res, sim, aim) {
 
 // ---------------- 選手 ----------------
 
-export function makePlayer(id) {
+export function makePlayer(id, attr) {
   const side = id === 'P' ? -1 : 1; // 自陣の符号
   return {
-    id, side,
+    id, side, attr: { ...DEF_ATTR, ...(attr || {}) },
     x: side * C.BASE_X, z: 0, y: 0, vx: 0, vz: 0, vy: 0,
-    swingT: -9, armed: null, lastQ: 1,
+    swingT: -9, swing: null, armed: null, lastQ: 1,
   };
 }
 
@@ -198,9 +290,9 @@ export function baseFor(pl) { return { x: pl.side * C.BASE_X, z: 0 }; }
 export function reachQuality(pl, sp) {
   if (Math.sign(sp.x) !== pl.side && Math.abs(sp.x) > 0.02) return 0;
   const d = hyp2(sp.x - pl.x, sp.z - pl.z);
-  const top = C.REACH_TOP + pl.y;
+  const top = pl.attr.reachTop + pl.y;
   if (sp.y < C.REACH_LOW || sp.y > top + 0.05) return 0;
-  const R = C.REACH + (Math.hypot(pl.vx, pl.vz) > 2.5 ? 0.25 : 0); // 踏み込み
+  const R = pl.attr.reach + (Math.hypot(pl.vx, pl.vz) > 2.5 ? 0.25 : 0); // 踏み込み
   if (d > R) return 0;
   let q = 1 - 0.55 * (d / R) ** 2;
   // 体の真上・真横すぎる打点や、頭上の限界ギリギリは質が落ちる
@@ -213,15 +305,15 @@ export function reachQuality(pl, sp) {
 export function moveToward(pl, tx, tz, dt, speedMul = 1) {
   const dx = tx - pl.x, dz = tz - pl.z;
   const d = Math.hypot(dx, dz);
-  const vmax = C.SPEED * speedMul;
-  const want = d < 0.05 ? 0 : Math.min(vmax, Math.sqrt(2 * C.ACC * 0.6 * d));
+  const vmax = pl.attr.speed * speedMul;
+  const want = d < 0.05 ? 0 : Math.min(vmax, Math.sqrt(2 * pl.attr.acc * 0.6 * d));
   const wx = d > 1e-6 ? dx / d * want : 0, wz = d > 1e-6 ? dz / d * want : 0;
   steer(pl, wx, wz, dt);
 }
 
 export function steer(pl, wx, wz, dt) {
   const ax = wx - pl.vx, az = wz - pl.vz;
-  const a = Math.hypot(ax, az), lim = C.ACC * dt;
+  const a = Math.hypot(ax, az), lim = (pl.attr ? pl.attr.acc : C.ACC) * dt;
   const f = a > lim ? lim / a : 1;
   pl.vx += ax * f; pl.vz += az * f;
   pl.x += pl.vx * dt; pl.z += pl.vz * dt;
@@ -244,19 +336,19 @@ export function stepJump(pl, dt) {
  */
 export function planIntercept(pl, sim, now, react, speedMul = 1, preferHigh = true) {
   let best = null;
-  const vmax = C.SPEED * speedMul;
+  const A = pl.attr, vmax = A.speed * speedMul, jumpH = A.jumpV * A.jumpV / (2 * C.G);
   for (const s of sim.path) {
     if (s.t < now) continue;
     if (Math.sign(s.x) !== pl.side) continue;
-    if (s.y < 0.25 || s.y > C.REACH_TOP + 0.45) continue;
+    if (s.y < 0.25 || s.y > A.reachTop + jumpH * 0.85) continue;
     const d = hyp2(s.x - pl.x, s.z - pl.z);
-    const need = react + Math.max(0, d - C.REACH * 0.8) / vmax;
+    const need = react + Math.max(0, d - A.reach * 0.8) / vmax;
     const margin = (s.t - now) - need;
     if (margin < -0.02) continue;
     // 高い打点ほど攻められる。余裕もある程度ほしい
-    const h = Math.min(s.y, C.REACH_TOP + 0.4);
+    const h = Math.min(s.y, A.reachTop + 0.4);
     const score = (preferHigh ? h * 0.45 : 0) + Math.min(margin, 0.4) * 1.2;
-    if (!best || score > best.score) best = { ...s, margin, score, jump: s.y > C.REACH_TOP - 0.05 };
+    if (!best || score > best.score) best = { ...s, margin, score, jump: s.y > A.reachTop - 0.05 };
   }
   return best;
 }
@@ -267,12 +359,12 @@ export function planIntercept(pl, sim, now, react, speedMul = 1, preferHigh = tr
  */
 export function receiverMargin(rcv, sim, react, speedMul = 1) {
   let best = -Infinity, bestH = 0, high = -Infinity, raw = -Infinity;
-  const vmax = C.SPEED * speedMul;
+  const A = rcv.attr || DEF_ATTR, vmax = A.speed * speedMul;
   for (const s of sim.path) {
     if (Math.sign(s.x) !== rcv.side) continue;
-    if (s.y < 0.2 || s.y > C.REACH_TOP + 0.45) continue;
+    if (s.y < 0.2 || s.y > A.reachTop + 0.45) continue;
     const d = hyp2(s.x - rcv.x, s.z - rcv.z);
-    const m = s.t - (react + Math.max(0, d - C.REACH) / vmax);
+    const m = s.t - (react * A.react + Math.max(0, d - A.reach) / vmax);
     if (m > raw) raw = m;
     if (s.y >= 1.6 && m > high) high = m;
     // 高い打点で取れるほど相手は攻められる → 価値を少し上乗せ
@@ -297,13 +389,13 @@ const SLICES = [0, 0.6, -0.6];
 export function chooseShot(hitter, rcv, contact, rng, level, opts = {}) {
   const side = -hitter.side;
   const cands = [];
-  const band = opts.serve ? { minE: -4, maxE: 62 } : contactBand(contact.y, hitter.y > 0.05);
+  const band = opts.serve ? { minE: -4, maxE: 62 } : contactBand(contact.y, hitter.y > 0.05, hitter.attr);
   for (const elev of ELEVS) {
     if (elev < band.minE - 4 || elev > band.maxE + 4) continue;
     for (const yaw of YAWS) for (const power of POWERS) for (const slice of SLICES) {
       if (slice && power < 0.2 && Math.abs(contact.x) > 2.4) continue;
       const aim = { elev, yaw, power, slice };
-      const res = launch(contact, side, aim, 1, { serve: opts.serve, jumping: hitter.y > 0.05 });
+      const res = launch(contact, side, aim, 1, { serve: opts.serve, jumping: hitter.y > 0.05, attr: hitter.attr });
       const sim = simulate(res.shuttle, { dt: 1 / 120, every: 3 });
       if (sim.end !== 'land' || !landsIn(sim.p, side, opts.serve)) continue;
       // ライン際・ネットすれすれは実行のブレで失点しやすい
@@ -312,10 +404,12 @@ export function chooseShot(hitter, rcv, contact, rng, level, opts = {}) {
       const clear = sim.clearance == null ? 9 : sim.clearance;
       if (edge < level.safety || clear < level.safety * 0.5) continue;
       const rm = receiverMargin(rcv, sim, level.oppReact ?? 0.22);
+      // 技巧派はカットで相手の一歩目を遅らせられる
+      if (slice && contact.y >= 2.0) rm.margin -= hitter.attr.deceive * Math.abs(slice);
       let value = -rm.margin;
       // 打った後に自分がホームへ戻れるか
       const bx = hitter.side * C.BASE_X;
-      const own = Math.max(0, hyp2(contact.x - bx, contact.z) / C.SPEED - sim.t * 0.8);
+      const own = Math.max(0, hyp2(contact.x - bx, contact.z) / hitter.attr.speed - sim.t * 0.8);
       value -= own * 0.35;
       // 甘い球（相手が高い打点で余裕を持って取れる）を嫌う
       if (rm.height > 2.1 && rm.margin > 0.3) value -= 0.25;
