@@ -1,4 +1,4 @@
-// Shared primitives for the 令和の虎 decks (easy manga version and proof version).
+// Shared primitives for the 三現ワークス business plan decks (easy manga version and proof version).
 // Same look as build_tora.js: black/white tokens, one copper accent, logotype bottom-right.
 const path = require("path");
 const sharp = require("sharp");
