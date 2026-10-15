@@ -1,4 +1,4 @@
-// Build the business plan deck for GEN³ Works (三現ワークス): 24 slides following 谷本吉紹氏の事業計画書チェックポイント ①〜⑦.
+// Build the business plan deck for KANTSUGI (カンツギ): 24 slides following 谷本吉紹氏の事業計画書チェックポイント ①〜⑦.
 // Usage: node build_deck.js [outDir]   (needs pptxgenjs and sharp)
 const path = require("path");
 const fs = require("fs");
@@ -8,7 +8,7 @@ const T = require("../design-system/georec/pptx-theme.js");
 
 const { color: K, size: S } = T;
 const OUT_DIR = process.argv[2] || __dirname;
-const OUT = path.join(OUT_DIR, "三現ワークス_事業計画書_本編.pptx");
+const OUT = path.join(OUT_DIR, "カンツギ_事業計画書_本編.pptx");
 const { customerValue, nationValue } = require("./tora_value.js");
 const CV = customerValue(), NV = nationValue(), CVH = customerValue({ docHoursPerMonth: 3, reworkCut: 0.1, coachCut: 0.15 });
 const man = (v) => Math.round(v).toLocaleString("en-US");
@@ -91,7 +91,7 @@ const TAGLINE = "現場の勘を、次の担い手へ。";
 // ---------- notes: time slot, the slide's one message, then the script ----------
 const NOTE_PARTS = {
   1: ["0:00 - 0:25", "人が減っても現場が迷わず回る仕組みをつくる。希望金額は500万円",
-    "株式会社三現ワークスです。三現とは、現場・現物・現実のこと。熟練者の勘が退職とともに消えていく現場に、スマートグラスで記録して次の担い手とAIに渡す仕組みをつくります。希望金額は500万円です。"],
+    "株式会社カンツギです。カンツギは「勘を継ぐ」。割れた器を金で継ぐ金継ぎのように、途切れそうな現場の勘をデータで継ぎます。熟練者の勘が退職とともに消えていく現場に、スマートグラスで記録して次の担い手とAIに渡す仕組みをつくります。希望金額は500万円です。"],
   2: ["0:25 - 1:00", "スマートグラスで工事の作業を記録し、報告と教育を自動にするサービス",
     "事業の概要です。何のビジネスか。施工管理者や電工がスマートグラスを着けるだけで作業を記録し、工事写真の整理と報告書づくり、若手の教育を自動にするサービスです。既存のサービスとの違いは、人が撮って入力するのではなく自動で記録し、図面と照合し、教材にまですること。お客様は、関東の中堅の電気工事会社です。収益は、1拠点あたり年300万円の利用料と、初年度の導入支援です。"],
   3: ["1:00 - 1:40", "AIは事務作業の支援から、作業者の「目と手」の支援へ",
@@ -147,13 +147,13 @@ const chap = (n, t) => `${n} ${t}`;
 async function main() {
   const pres = new pptxgen();
   pres.layout = T.slide.layout;
-  pres.title = "株式会社三現ワークス 事業計画書";
+  pres.title = "株式会社カンツギ 事業計画書";
   pres.theme = { headFontFace: F, bodyFontFace: F };
 
-  const markBlack = await logo("gen3-mark-black");
-  const markWhite = await logo("gen3-mark-white");
-  const wordWhite = await logo("gen3-logotype-reverse");
-  const logoColor = await logo("gen3-logotype-color");
+  const markBlack = await logo("kantsugi-cube-mono");
+  const markWhite = await logo("kantsugi-cube-reverse");
+  const wordWhite = await logo("kantsugi-logotype-reverse");
+  const logoColor = await logo("kantsugi-logotype-color");
 
   pres.defineSlideMaster({
     title: "GR_CONTENT",
@@ -173,8 +173,8 @@ async function main() {
     box(s, { x: 0, y: 0, w: 3.6, h: 5.625, fill: K.ink, name: "cover-panel" });
     s.addImage({ data: wordWhite, x: 0.35, y: 1.05, w: 3.0, h: 3.0 * 120 / 560 });
     txt(s, "現場の勘を、\n次の担い手へ。", { x: 0.4, y: 2.15, w: 3.0, h: 0.85, size: 20, bold: true, color: K.paper, lsm: 1.2 });
-    txt(s, "株式会社三現ワークス（事業計画）", { x: 0.4, y: 3.2, w: 3.0, h: 0.3, size: 11, color: K.paper });
-    txt(s, "三現＝現場・現物・現実", { x: 0.4, y: 3.52, w: 3.0, h: 0.28, size: 9.5, color: K.paper });
+    txt(s, "株式会社カンツギ（事業計画）", { x: 0.4, y: 3.2, w: 3.0, h: 0.3, size: 11, color: K.paper });
+    txt(s, "勘継＝金継ぎのように現場の勘を継ぐ", { x: 0.4, y: 3.52, w: 3.0, h: 0.28, size: 9.5, color: K.paper });
     const rx = 4.0, rw = 5.3;
     txt(s, "事業計画書", { x: rx, y: 0.55, w: rw, h: 0.28, size: S.lead, color: K.gray700 });
     txt(s, "人が減っても、\n現場が迷わず回る仕組みをつくる", { x: rx, y: 0.9, w: rw, h: 0.85, size: 22, bold: true, lsm: 1.2 });
@@ -517,7 +517,7 @@ async function main() {
       ["蔵衛門（工事写真）", 0.08, 0.86, false, "r"],
       ["tebiki（手順の器）", 0.14, 0.26, false, "r"],
       ["遠隔臨場カメラ", 0.78, 0.82, false, "l"],
-      ["三現ワークス", 0.9, 0.18, true, "l"],
+      ["カンツギ", 0.9, 0.18, true, "l"],
       ["社内の熟練者（属人）", 0.58, 0.06, false, "l"],
     ];
     dots.forEach(([label, fx, fy, ours, side]) => {
@@ -535,7 +535,7 @@ async function main() {
       ["蔵衛門", "人が撮影", "○ 写真台帳", "×"],
       ["遠隔臨場カメラ（各社）", "○ 映像", "×", "×"],
       ["tebiki／Teachme Biz", "×", "×", "△ 器のみ"],
-      [{ text: "三現ワークス", bold: true }, { text: "○ 一人称で自動", bold: true }, { text: "○ 写真を自動抽出", bold: true }, { text: "○ 図面照合＋教材", bold: true }],
+      [{ text: "カンツギ", bold: true }, { text: "○ 一人称で自動", bold: true }, { text: "○ 写真を自動抽出", bold: true }, { text: "○ 図面照合＋教材", bold: true }],
     ], { x: sx, y: my + 0.3, w: sw, colW: [1.5, 1.1, 1.05, 1.0], rowH: 0.27, size: 8, align: "left", strongRows: [6], name: "competitors" });
     const ty = my + 0.3 + 7 * 0.27 + 0.1;
     box(s, { x: sx, y: ty, w: sw, h: 0.72, fill: K.ink, name: "threat" });

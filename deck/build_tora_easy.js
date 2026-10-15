@@ -1,4 +1,4 @@
-// 三現ワークス 事業計画書「やさしい版（マンガ）」: story and the money mechanics in comic panels.
+// カンツギ 事業計画書「やさしい版（マンガ）」: story and the money mechanics in comic panels.
 // Usage: node build_tora_easy.js [outDir]   (needs pptxgenjs and sharp)
 const path = require("path");
 const fs = require("fs");
@@ -8,7 +8,7 @@ const { run: model } = require("./tora_model.js");
 
 const { K, S, X0, W, ACC, txt, box, hline, arrow, run, heading, panel, bubble, sfx, png, charSVG, iconSVG } = L;
 const OUT_DIR = process.argv[2] || __dirname;
-const OUT = path.join(OUT_DIR, "三現ワークス_事業計画書_やさしい版.pptx");
+const OUT = path.join(OUT_DIR, "カンツギ_事業計画書_やさしい版.pptx");
 const { customerValue } = require("./tora_value.js");
 const CV = customerValue();
 const man = (v) => Math.round(v).toLocaleString("en-US");
@@ -18,7 +18,7 @@ const M = (v) => Math.round(v / 100); // 万円 → 百万円
 // ---------- notes: what to say, in spoken words ----------
 const NOTE_PARTS = {
   1: ["表紙・20秒", "数字は3つだけ。300万円、255万円、2.8拠点",
-    "三現ワークスです。今日はお金の仕組みを、3つの数字だけでお話しします。お客様が1拠点で年300万円払う。そのうち255万円が当社に残る。社員1人で2.8拠点を見られれば黒字。この3つです。"],
+    "カンツギです。今日はお金の仕組みを、3つの数字だけでお話しします。お客様が1拠点で年300万円払う。そのうち255万円が当社に残る。社員1人で2.8拠点を見られれば黒字。この3つです。"],
   2: ["登場人物・30秒", "お金を払うのは電気工事会社。窓口は工事部長",
     "登場人物は4人です。来年定年の熟練の電工、田中さん。入社2年目の施工管理、佐藤くん。報告書と育成で手一杯の山本工事部長。そして私です。ここで大事なのは、お金を払うのは現場の人ではなく会社、つまり工事部長や社長だということです。"],
   3: ["第1話・40秒", "熟練者の勘は書かれていない。辞めたら止まる",
@@ -56,7 +56,7 @@ const NOTES = Object.fromEntries(Object.entries(NOTE_PARTS).map(([n, [t, msg, bo
 
 async function main() {
   const pres = new pptxgen();
-  const add = await L.setup(pres, "マンガでわかる 三現ワークスのもうけの仕組み", NOTES);
+  const add = await L.setup(pres, "マンガでわかる カンツギのもうけの仕組み", NOTES);
 
   const C = {};
   for (const r of ["veteran", "junior", "manager", "founder", "client"])
@@ -69,8 +69,8 @@ async function main() {
   // ---------- 1 表紙 ----------
   {
     const s = add(1);
-    txt(s, "三現ワークス　事業計画書　やさしい版", { x: X0, y: 0.35, w: 5.5, h: 0.3, size: 11, color: K.gray700 });
-    txt(s, [run("マンガでわかる", { breakLine: true }), run("三現ワークスの"), run("もうけの仕組み", { color: ACC })], { x: X0, y: 0.68, w: 6.0, h: 1.1, size: 28, bold: true, lsm: 1.1 });
+    txt(s, "カンツギ　事業計画書　やさしい版", { x: X0, y: 0.35, w: 5.5, h: 0.3, size: 11, color: K.gray700 });
+    txt(s, [run("マンガでわかる", { breakLine: true }), run("カンツギの"), run("もうけの仕組み", { color: ACC })], { x: X0, y: 0.68, w: 6.0, h: 1.1, size: 28, bold: true, lsm: 1.1 });
     box(s, { x: 6.75, y: 0.45, w: 2.85, h: 1.25, line: ACC, lw: 2, name: "ask" });
     txt(s, "希望金額", { x: 6.95, y: 0.52, w: 2, h: 0.28, size: 11, bold: true, color: K.gray700 });
     txt(s, "500万円", { x: 6.95, y: 0.8, w: 2.6, h: 0.8, size: 38, bold: true, color: ACC, valign: "middle" });
@@ -100,7 +100,7 @@ async function main() {
       ["veteran-normal", "田中さん（62歳）", "熟練の電工。来年、定年", "勘で分かる。\nでも説明はできん"],
       ["junior-worried", "佐藤くん（24歳）", "入社2年目の施工管理", "田中さんが辞めたら\nどうしよう…"],
       ["manager-worried", "山本工事部長（50歳）", "管理者。お金を払う人", "報告書と育成で\n手一杯だ"],
-      ["founder-happy", "社長（わたし）", "三現ワークス。元・施工管理", "現場の勘を、\n次の担い手へ"],
+      ["founder-happy", "社長（わたし）", "カンツギ。元・施工管理", "現場の勘を、\n次の担い手へ"],
     ];
     const cw = 2.2, gap = 0.133, top = 1.15;
     cast.forEach(([k, n, r, say], i) => {
@@ -245,7 +245,7 @@ async function main() {
     ch(s, "manager-normal", X0 + 0.25, top + 1.6, 1.15);
     txt(s, "電気工事会社（お客様）", { x: X0 - 0.25, y: top + 2.8, w: 1.95, h: 0.26, size: 10, bold: true, align: "center" });
     ch(s, "founder-happy", X0 + 3.6, top + 1.0, 1.55);
-    txt(s, "三現ワークス", { x: X0 + 3.35, y: top + 2.6, w: 1.8, h: 0.26, size: 10, bold: true, align: "center" });
+    txt(s, "カンツギ", { x: X0 + 3.35, y: top + 2.6, w: 1.8, h: 0.26, size: 10, bold: true, align: "center" });
     arrow(s, X0 + 1.55, top + 1.0, 1.9, 0, { lw: 4, color: ACC });
     ic(s, "coin", X0 + 2.15, top + 0.25, 0.6);
     txt(s, [run("年300万円", { bold: true, fontSize: 16, color: ACC, breakLine: true }), run("（月25万円）", { fontSize: 10 })], { x: X0 + 1.5, y: top + 1.12, w: 2.0, h: 0.6, align: "center" });
@@ -491,7 +491,7 @@ async function main() {
 
     const cx = 3.75, cw = 2.45;
     box(s, { x: cx, y: top + 0.35, w: cw, h: 3.2, fill: K.ink });
-    txt(s, "三現ワークス", { x: cx, y: top + 0.45, w: cw, h: 0.3, size: 12, bold: true, color: K.paper, align: "center" });
+    txt(s, "カンツギ", { x: cx, y: top + 0.45, w: cw, h: 0.3, size: 12, bold: true, color: K.paper, align: "center" });
     ic(s, "server", cx + 0.95, top + 0.85, 0.7);
     txt(s, [run("AIが整理", { bold: true, breakLine: true }), run("記録が貯まるほど", { breakLine: true }), run("真似されにくくなる", { color: "E3A774", bold: true })], { x: cx + 0.1, y: top + 1.6, w: cw - 0.2, h: 0.85, size: 10, color: K.paper, align: "center" });
     txt(s, [run("1拠点の粗利 255万円", { bold: true, breakLine: true }), run("（300万円 − サーバー代45万円）")], { x: cx + 0.1, y: top + 2.55, w: cw - 0.2, h: 0.6, size: 9.5, color: K.paper, align: "center" });

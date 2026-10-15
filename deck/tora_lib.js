@@ -1,4 +1,4 @@
-// Shared primitives for the 三現ワークス business plan decks (easy manga version and proof version).
+// Shared primitives for the カンツギ business plan decks (easy manga version and proof version).
 // Same look as build_tora.js: black/white tokens, one copper accent, logotype bottom-right.
 const path = require("path");
 const sharp = require("sharp");
@@ -201,7 +201,7 @@ async function setup(pres, title, notes) {
   pres.layout = T.slide.layout;
   pres.title = title;
   pres.theme = { headFontFace: F, bodyFontFace: F };
-  const logoColor = await png("gen3-logotype-color");
+  const logoColor = await png("kantsugi-logotype-color");
   pres.defineSlideMaster({
     title: "GR_CONTENT",
     background: { color: K.paper },

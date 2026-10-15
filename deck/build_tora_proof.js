@@ -1,4 +1,4 @@
-// 三現ワークス 事業計画書「理論武装版」: every number traced to its formula, assumption and source.
+// カンツギ 事業計画書「理論武装版」: every number traced to its formula, assumption and source.
 // All figures come from tora_model.js, so the tables and the stress test always match the plan.
 // Usage: node build_tora_proof.js [outDir]   (needs pptxgenjs and sharp)
 const path = require("path");
@@ -10,7 +10,7 @@ const { estimate } = require("./tora_market.js");
 
 const { K, S, X0, W, ACC, txt, box, hline, arrow, run, heading, table, fmt, tri } = L;
 const OUT_DIR = process.argv[2] || __dirname;
-const OUT = path.join(OUT_DIR, "三現ワークス_事業計画書_理論武装版.pptx");
+const OUT = path.join(OUT_DIR, "カンツギ_事業計画書_理論武装版.pptx");
 const { customerValue, nationValue } = require("./tora_value.js");
 const CV = customerValue(), NV = nationValue();
 const base = model();
@@ -74,15 +74,15 @@ const foot = (s, t) => txt(s, t, { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, 
 
 async function main() {
   const pres = new pptxgen();
-  const add = await L.setup(pres, "三現ワークス 事業計画書 理論武装版", NOTES);
+  const add = await L.setup(pres, "カンツギ 事業計画書 理論武装版", NOTES);
 
   // ---------- 1 表紙 ----------
   {
     const s = add(1);
     box(s, { x: 0, y: 0, w: 3.6, h: 5.625, fill: K.ink });
-    s.addImage({ data: await L.png("gen3-logotype-reverse"), x: 0.35, y: 1.05, w: 3.0, h: 3.0 * 120 / 560 });
+    s.addImage({ data: await L.png("kantsugi-logotype-reverse"), x: 0.35, y: 1.05, w: 3.0, h: 3.0 * 120 / 560 });
     txt(s, "数字には、\nすべて式と\n前提がある。", { x: 0.4, y: 2.1, w: 3.0, h: 1.4, size: 20, bold: true, color: K.paper, lsm: 1.2 });
-    txt(s, "三現ワークス　事業計画書　別冊", { x: 4.0, y: 0.55, w: 5.5, h: 0.28, size: S.lead, color: K.gray700 });
+    txt(s, "カンツギ　事業計画書　別冊", { x: 4.0, y: 0.55, w: 5.5, h: 0.28, size: S.lead, color: K.gray700 });
     txt(s, [run("理論武装版", { color: ACC, breakLine: true }), run("数字の根拠と、崩れたときの備え")], { x: 4.0, y: 0.9, w: 5.6, h: 1.0, size: 24, bold: true, lsm: 1.15 });
     const toc = [["根拠1〜2", "数字の木と、11個の前提"], ["根拠3〜4", "価格・お客様の回収・導入効果"], ["根拠5〜8", "売上・費用・損益分岐点・LTV/CAC"], ["根拠9〜10", "ストレステストと資金計画"], ["根拠11〜14", "市場・最初の顧客・端末・厳しい質問"]];
     toc.forEach(([a, b], i) => {
@@ -475,7 +475,7 @@ async function main() {
       ["ARの位置ずれは？", "数mm〜cmずれます。最終確認はスケール。間違いに気づく道具です", "根拠13"],
       ["あなたが倒れたら？", "役割を絞り判断基準を先に決め、1か月不在でも回る形にします", "発表資料リスク"],
     ], { x: X0, y: 1.12, w: W, colW: [2.1, 5.9, 1.2], rowH: 0.26, size: 8, leftCols: [1], align: "center", name: "qa" });
-    foot(s, "詳しい想定問答は「三現ワークス_想定問答.md」");
+    foot(s, "詳しい想定問答は「カンツギ_想定問答.md」");
   }
 
   // ---------- 16 出典 ----------

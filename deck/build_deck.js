@@ -1,4 +1,4 @@
-// Build the GEN³ Works (三現ワークス) business-plan deck (8 slides, speaker notes) with pptxgenjs.
+// Build the KANTSUGI (カンツギ) business-plan deck (8 slides, speaker notes) with pptxgenjs.
 // Usage: node build_deck.js [outDir]   (needs pptxgenjs and sharp)
 const path = require("path");
 const fs = require("fs");
@@ -82,7 +82,7 @@ const TAGLINE = "現場の勘を、次の担い手へ。";
 // ---------- notes: time slot, the slide's one message, then the script ----------
 const NOTE_PARTS = {
   1: ["0:00 - 0:50", "人が減っても現場が迷わず回る仕組みをつくり、日本の品質を支える現場の勘を遺産として残す（設問③）",
-    "株式会社三現ワークスの事業構想を発表します。三現とは、現場・現物・現実のことです。メイド・イン・ジャパンの品質を支えてきたのは、現場の熟練者の勘です。その勘は、記録に残らないまま、退職とともに失われつつあります。この会社の存在意義は「現場の勘を、次の担い手へ。」です。使命は、熟練者の勘を言葉にし、教材と仕組みで次の人へ渡すこと。5年後には85の拠点で、勘どころが教材として残っている状態を目指します。今年7月に閣議決定された国の人工知能基本計画も、暗黙知が豊富な現場へのAIの実装を推進すると明記しています。この会社は、その現場の側に立ちます。"],
+    "株式会社カンツギの事業構想を発表します。カンツギは「勘を継ぐ」。金継ぎのように、途切れそうな現場の勘をデータで継ぎます。メイド・イン・ジャパンの品質を支えてきたのは、現場の熟練者の勘です。その勘は、記録に残らないまま、退職とともに失われつつあります。この会社の存在意義は「現場の勘を、次の担い手へ。」です。使命は、熟練者の勘を言葉にし、教材と仕組みで次の人へ渡すこと。5年後には85の拠点で、勘どころが教材として残っている状態を目指します。今年7月に閣議決定された国の人工知能基本計画も、暗黙知が豊富な現場へのAIの実装を推進すると明記しています。この会社は、その現場の側に立ちます。"],
   2: ["0:50 - 2:00", "デジタル化は進んだのに、技能継承は人頼みのまま",
     "まず、解きたい課題です。たとえば押出ラインで外径が振れたとき、熟練者は音や湿度を見て温度を少し下げて立て直します。この判断は手順書に書かれていません。国の調査を見ると、製造業で業務改善にデジタル技術を使っている企業は77.2%にのぼります。ところが、その効果として技能継承が円滑になった企業は8.7%しかありません。デジタル化は進んだのに、技能継承にはほとんど効いていないのです。実際、技能継承の取り組みで最も多いのは、再雇用や勤務延長でベテランに居続けてもらうことで、54.8%です。継承は、いまも人に頼ったままです。さらに製造業の62.8%が、指導する人材が足りないと答えています。私は施工管理として製品が使われる現場を見てきました。そして、仕組みを自分で作れます。だからこの課題に取り組みます。"],
   3: ["2:00 - 3:30", "一人称の作業データを撮り続け、報告を自動にし、人とAIの教材にする",
@@ -103,12 +103,12 @@ const NOTES = Object.fromEntries(Object.entries(NOTE_PARTS).map(([n, [t, msg, bo
 async function main() {
   const pres = new pptxgen();
   pres.layout = T.slide.layout;
-  pres.title = "株式会社三現ワークス 事業構想";
+  pres.title = "株式会社カンツギ 事業構想";
   pres.theme = { headFontFace: F, bodyFontFace: F };
 
-  const markBlack = await logo("gen3-mark-black");
-  const markWhite = await logo("gen3-mark-white");
-  const wordWhite = await logo("gen3-wordmark-white");
+  const markBlack = await logo("kantsugi-cube-mono");
+  const markWhite = await logo("kantsugi-cube-reverse");
+  const wordWhite = await logo("kantsugi-logotype-reverse");
 
   pres.defineSlideMaster({
     title: "GR_CONTENT",
@@ -129,8 +129,8 @@ async function main() {
     txt(s, "PURPOSE　存在意義", { x: 0.35, y: 2.15, w: 2.9, h: 0.24, size: 9, bold: true, color: K.paper });
     txt(s, "現場の勘を、\n次の担い手へ。", { x: 0.35, y: 2.4, w: 2.9, h: 0.8, size: 20, bold: true, color: K.paper, lsm: 1.2 });
     txt(s, "日本の品質を支える現場の勘を、人に依存しない遺産として残す", { x: 0.35, y: 3.25, w: 2.75, h: 0.5, size: 9.5, color: K.paper });
-    txt(s, "株式会社三現ワークス（事業構想）", { x: 0.35, y: 3.85, w: 2.9, h: 0.3, size: 11, color: K.paper });
-    txt(s, "三現＝現場・現物・現実", { x: 0.35, y: 4.17, w: 2.9, h: 0.28, size: 9.5, color: K.paper });
+    txt(s, "株式会社カンツギ（事業構想）", { x: 0.35, y: 3.85, w: 2.9, h: 0.3, size: 11, color: K.paper });
+    txt(s, "勘継＝金継ぎのように現場の勘を継ぐ", { x: 0.35, y: 4.17, w: 2.9, h: 0.28, size: 9.5, color: K.paper });
 
     const rx = 3.75, rw = 5.55;
     txt(s, "リワーク実習　セルフマネジメント課題", { x: rx, y: 0.5, w: rw, h: 0.28, size: S.lead, color: K.gray700 });
@@ -331,7 +331,7 @@ async function main() {
       ["AR作業支援", 0.34, 0.43, false, "l"],
       ["CADDi（組立・図面）", 0.58, 0.1, false, "r"],
       ["Airion（貯めるまで）", 0.7, 0.36, false, "r"],
-      ["三現ワークス", 0.9, 0.24, true, "l"],
+      ["カンツギ", 0.9, 0.24, true, "l"],
       ["三菱総研 匠AI", 0.62, 0.7, false, "r"],
       ["社内の熟練者（属人）", 0.86, 0.88, false, "l"],
     ];
@@ -355,7 +355,7 @@ async function main() {
       ["FRONTEO KIBIT", "△ 既存文書", "×", "業種横断"],
       ["tebiki／Teachme Biz", "×", "△ 器のみ", "業種横断"],
       ["AR作業支援（各社）", "×", "△ 手順表示", "業種横断"],
-      [{ text: "三現ワークス", bold: true }, { text: "○ 常時収録", bold: true }, { text: "○ 現物照合＋教材", bold: true }, { text: "連続工程", bold: true }],
+      [{ text: "カンツギ", bold: true }, { text: "○ 常時収録", bold: true }, { text: "○ 現物照合＋教材", bold: true }, { text: "連続工程", bold: true }],
     ];
     table(s, [head, ...rows], { x: sx, y: my + 0.3, w: sw, colW: cols, rowH: 0.27, size: 8, align: "left", strongRows: [7], name: "store-handoff" });
     const ty = my + 0.3 + 8 * 0.27 + 0.08;
