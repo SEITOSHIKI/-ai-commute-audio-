@@ -218,4 +218,40 @@ async function setup(pres, title, notes) {
 const fmt = (v) => Math.round(v).toLocaleString("en-US");
 const tri = (v) => (v < 0 ? "▲" + fmt(-v) : fmt(v));
 
-module.exports = { T, K, S, F, X0, W, ACC, TAGLINE, png, txt, box, hline, arrow, run, heading, table, panel, bubble, sfx, charSVG, iconSVG, setup, fmt, tri };
+// "黒字化の条件と撤退ライン": shortfall table (left) and go / fix / stop gates (right). Used by the proof and easy decks.
+function gates(slide, shortfall, o = {}) {
+  const top = o.top || 1.15, lw = 5.3, mil = (v) => Math.round(v / 100);
+  txt(slide, "新規拠点が計画に届かなかったら（百万円）", { x: X0, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
+  const yr = (r) => (r.firstBlack ? r.firstBlack + "年目" : "しない");
+  const rows = [1, 0.8, 0.7, 0.6, 0.5].map((k) => {
+    const a = shortfall(k, true), b = shortfall(k, false), hit = k === 0.6;
+    const c = (ok) => ({ color: ok ? K.ink : ACC, bold: hit || !ok });
+    return [{ text: k === 1 ? "計画どおり" : `計画の${k * 10}割`, bold: hit, color: hit ? ACC : K.ink }, { text: a.rows.map((r) => r.nw).join("・"), color: K.gray700 },
+      { text: yr(a), ...c(!!a.firstBlack) }, { text: String(mil(a.minCash)), ...c(a.minCash > 0) }, { text: yr(b), ...c(!!b.firstBlack) }, { text: String(mil(b.minCash)), ...c(b.minCash > 0) }];
+  });
+  txt(slide, "採用を実績に合わせる", { x: X0 + 2.5, y: top + 0.3, w: 1.4, h: 0.24, size: 8.5, bold: true, align: "center", valign: "middle", fill: K.fill });
+  txt(slide, "採用は計画どおり", { x: X0 + 3.9, y: top + 0.3, w: 1.4, h: 0.24, size: 8.5, bold: true, color: ACC, align: "center", valign: "middle", fill: K.fill });
+  table(slide, [["新規の達成度", "新規拠点（1〜5年目）", "黒字化", "最低現金", "黒字化", "最低現金"], ...rows],
+    { x: X0, y: top + 0.55, w: lw, colW: [1.05, 1.45, 0.7, 0.7, 0.7, 0.7], rowH: 0.32, size: 8.5, align: "center", strongRows: [4], name: "shortfall" });
+  box(slide, { x: X0, y: top + 2.62, w: lw, h: 0.9, fill: K.ink });
+  txt(slide, [run("読み方", { bold: true, color: "E3A774", breakLine: true }),
+    run("採用を遅らせれば、計画の6割で黒字、5割を割ると黒字にならない。", { breakLine: true }),
+    run("遅れているのに計画どおり採用すると、7割でも現金が尽きる。", { breakLine: true }),
+    run("採用は「期末で社員1人3拠点」の見込みが立ってから")], { x: X0 + 0.15, y: top + 2.64, w: lw - 0.3, h: 0.86, size: 9, color: K.paper, valign: "middle", psa: 1 });
+  const rx = 6.0, rw = 3.6;
+  txt(slide, "進む・直す・止まるの線", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
+  [["1年目末", "実証3社のうち本契約", [["2社以上", "進む", K.ink], ["1社", "値段と顧客を見直す", K.gray700], ["0社", "撤退か方向転換", ACC]]],
+   ["2年目末", "新規拠点", [["5以上", "計画どおり採用", K.ink], ["5未満", "採用を止める", ACC]]]].forEach(([when, what, opts], i) => {
+    const y = top + 0.32 + i * 1.62, h = opts.length * 0.38 + 0.36;
+    box(slide, { x: rx, y, w: rw, h, line: K.ink, lw: 1 });
+    txt(slide, [run(when + "　", { bold: true, color: ACC }), run(what, { bold: true })], { x: rx + 0.12, y: y + 0.04, w: rw - 0.24, h: 0.28, size: 9.5, valign: "middle" });
+    opts.forEach(([cond, act, c], j) => {
+      const yy = y + 0.36 + j * 0.38;
+      box(slide, { x: rx + 0.12, y: yy, w: 0.85, h: 0.32, fill: c });
+      txt(slide, cond, { x: rx + 0.12, y: yy, w: 0.85, h: 0.32, size: 9, bold: true, color: K.paper, align: "center", valign: "middle" });
+      txt(slide, "→ " + act, { x: rx + 1.05, y: yy, w: rw - 1.15, h: 0.32, size: 9.5, valign: "middle" });
+    });
+  });
+}
+
+module.exports = { T, K, S, F, X0, W, ACC, TAGLINE, png, txt, box, hline, arrow, run, heading, table, panel, bubble, sfx, charSVG, iconSVG, setup, fmt, tri, gates };
