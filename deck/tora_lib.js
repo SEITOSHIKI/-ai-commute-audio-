@@ -42,7 +42,7 @@ function arrow(slide, x, y, w, h, o = {}) {
 const run = (text, o = {}) => ({ text, options: { fontFace: F, ...o } });
 
 function heading(slide, title, lead) {
-  const m = /^([①②③④⑤⑥⑦]|第\d話|お金の話\d|根拠\d+)\s*(.*)$/.exec(title);
+  const m = /^([①②③④⑤⑥⑦]|第\d話|お金の話\d|根拠\d+|見直し\d+)\s*(.*)$/.exec(title);
   if (m) title = [run(m[1] + " ", { color: ACC }), run(m[2])];
   txt(slide, title, { x: X0, y: 0.28, w: 8.7, h: 0.42, size: S.slideTitle, bold: true, valign: "middle", name: "title" });
   if (lead) txt(slide, lead, { x: X0, y: 0.72, w: 8.7, h: 0.28, size: S.lead, color: K.gray700, valign: "middle", name: "lead" });
