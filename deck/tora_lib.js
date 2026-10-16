@@ -220,8 +220,8 @@ const tri = (v) => (v < 0 ? "▲" + fmt(-v) : fmt(v));
 
 // "黒字化の条件と撤退ライン": shortfall table (10台 vs 15台, hiring linked) and the go / fix / stop gates. Used by every deck.
 function gates(slide, V, o = {}) {
-  const top = o.top || 1.12, mil = (v) => Math.round(v / 100);
-  const d15 = { devices: 15, mix: { cam: 12, hmd: 3 } };
+  const top = o.top || 1.12, mil = (v) => Math.round(v / 100), be = Math.round(V.customerValue().breakEvenMin);
+  const d15 = { devices: 15, mix: { glass: 12, display: 3 } };
   const sc = (k, plan) => V.run({ plan, newSites: V.GROWTH.newSites.map((n) => Math.round(n * k)), contract: V.GROWTH.contract.map((c) => c * k), hireK: k < 1 ? k : undefined });
   const yr = (r) => (r.firstBlack ? r.firstBlack + "年目" : "5年でしない");
   const cell = (r) => [{ text: yr(r), color: r.firstBlack ? K.ink : ACC, bold: !r.firstBlack }, { text: tri(mil(r.y5.op)), color: r.y5.op < 0 ? ACC : K.ink }, { text: String(mil(r.minCash)), color: r.minCash < 0 ? ACC : K.ink }];
@@ -237,10 +237,10 @@ function gates(slide, V, o = {}) {
   const gy = top + 2.12;
   txt(slide, "進む・直す・止まるの線（案）", { x: X0, y: gy, w: W, h: 0.26, size: 10, bold: true });
   table(slide, [["時期", "測るもの", "進む", "直す", "止まる"],
-    ["実証（準備期）", "1台1日の削減時間", "26分以上", "15〜26分：機能を写真台帳に絞る", "15分未満：撤退"],
+    ["実証（準備期）", "1台1日の削減時間", `${be}分以上`, `15〜${be}分：機能を写真台帳に絞る`, "15分未満：撤退"],
     ["1年目末", "試験導入3社の本契約", "2社以上", "1社：値段と顧客を見直す", "0社：撤退か方向転換"],
     ["2年目末", "新規拠点・1拠点の台数", "5拠点以上・平均12台", "5拠点未満：採用を止める", "─"],
-    ["3年目", "シリーズAの交渉", "継続率90%以上", "未達：調達額と採用を絞る", "─"]],
+    ["3年目", "追加の5,000万円を入れるか", "継続率90%以上", "未達：追加額と採用を絞る", "─"]],
     { x: X0, y: gy + 0.28, w: W, colW: [1.2, 1.9, 1.6, 2.5, 2.0], rowH: 0.25, size: 8.5, leftCols: [1, 2, 3, 4], name: "gates" });
 }
 
