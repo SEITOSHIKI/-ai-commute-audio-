@@ -75,11 +75,21 @@ const ROLES = [ // [役割, 年収, 1〜5年目の人数, 何をするか, 求�
 const LOAD = 1.2;          // 会社負担 法定福利16%＋福利厚生・研修4%（見積）
 const RECRUIT_RATE = 0.15; // 採用費：年収の30%（人材紹介の相場）×紹介会社経由の割合50%（見積）
 const ADVISORS = 180;      // 社外技術顧問（大学・映像AI）月10万＋業界顧問（電気工事業OB）月5万
-function team() {
-  return [0, 1, 2, 3, 4].map((y) => {
+// 6〜10年目の延長の前提（見積）。5年目までの計画は変えずに、その先を同じ式で計算する
+const EXT = {
+  newSites: [36, 38, 40, 40, 40],              // 関東の中堅で頭打ち。大手の支店と電気通信工事で少しずつ伸ばす（電線工場・海外は入れない）
+  contract: [1000, 1100, 1200, 1300, 1400],    // 個社設定（売上の5%以下）
+  heads: [[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [6, 6, 7, 7, 8], [2, 3, 3, 3, 4], [8, 9, 9, 9, 9], [3, 4, 4, 4, 4], [2, 2, 3, 3, 3], [1, 1, 1, 2, 2]], // ROLES の順
+  other: { office: [600, 700, 700, 800, 800], ads: [500, 550, 600, 600, 600], travel: [550, 600, 650, 700, 700], tools: [400, 400, 450, 450, 500],
+    experts: [200, 220, 220, 250, 250], misc: [200, 220, 240, 260, 280], ml: [400, 440, 480, 520, 560] },
+  funding: [0, 0, 0, 0, 0],
+};
+const headsAt = (i, y) => (y < 5 ? ROLES[i][2][y] : EXT.heads[i][y - 5]);
+function team(years = 5) {
+  return Array.from({ length: years }, (_, y) => y).map((y) => {
     let n = 0, pay = 0, hires = 0;
-    const rows = ROLES.map(([name, sal, heads]) => {
-      const s = Array.isArray(sal) ? sal[y] : sal, h = heads[y], prev = y ? heads[y - 1] : 0;
+    const rows = ROLES.map(([name, sal], i) => {
+      const s = Array.isArray(sal) ? sal[Math.min(y, 4)] : sal, h = headsAt(i, y), prev = y ? headsAt(i, y - 1) : 0;
       n += h; pay += s * h * LOAD; hires += Math.max(0, h - prev) * s;
       return { name, salary: s, heads: h };
     });
@@ -109,10 +119,15 @@ const CSDAY = 600 * LOAD / 240; // 導入コンサルタントの日額（万円
 
 // o: { newSites, contract, churnRate, funding, plan, perDevice, priceK, hireK (採用を拠点数に連動), salaryAdd (年収への上乗せ) }
 function run(o = {}) {
+  const years = o.years || 5, ext = (a, e) => (a.length >= years ? a : a.concat(e));
   const g = { ...GROWTH, ...o }, p = { ...PLAN, ...(o.plan || {}) };
+  if (years > 5) {
+    g.newSites = ext(g.newSites, EXT.newSites); g.contract = ext(g.contract, EXT.contract); g.funding = ext(g.funding, EXT.funding);
+    g.other = Object.fromEntries(Object.entries(g.other).map(([k, v]) => [k, ext(v, EXT.other[k])]));
+  }
   if (o.priceK) { p.baseFee *= o.priceK; p.deviceFee *= o.priceK; }
   const perDev = o.perDevice ?? cloudPerDevice;
-  const T = team();
+  const T = team(years);
   let sites = 0, cash = 0, cum = 0;
   const rows = T.map((t, y) => {
     const planStaff = t.staff;
@@ -142,7 +157,8 @@ function run(o = {}) {
       perStaff: sga / staff, bep: sga / (gp / sales), sitesPerStaff: sites / staff, licMargin: license ? 1 - licCost / license : 0, funding: g.funding[y] };
   });
   const fb = rows.find((r) => r.op > 0);
-  return { rows, firstBlack: fb ? fb.year : null, minCash: Math.min(...rows.map((r) => r.cash)), y5: rows[4], cumPeak: Math.min(...rows.map((r) => r.cum)) };
+  const fc = rows.find((r) => r.cum > 0);
+  return { rows, firstBlack: fb ? fb.year : null, cumBack: fc ? fc.year : null, minCash: Math.min(...rows.map((r) => r.cash)), y5: rows[4], cumPeak: Math.min(...rows.map((r) => r.cum)) };
 }
 
 // 新規が計画のk割しか取れなかったら。linked＝採用も拠点数に合わせて遅らせる
@@ -160,7 +176,7 @@ function unit(p = PLAN) {
 }
 
 module.exports = { WAGE, H, PLAN, priceSite, leaseSite, SAVE, customerValue, CLOUD, cloudPerDevice, FULL_UPLOAD_PER_DEVICE, siteInfra, cogsSite, marginSite,
-  SETUP_TASKS, setupDays, setupTravel, ROLES, LOAD, RECRUIT_RATE, ADVISORS, team, GROWTH, SALES_HEADS, CSDAY, run, shortfall, unit };
+  SETUP_TASKS, setupDays, setupTravel, ROLES, EXT, LOAD, RECRUIT_RATE, ADVISORS, team, GROWTH, SALES_HEADS, CSDAY, run, shortfall, unit };
 
 if (require.main === module) {
   console.log("hourly", H, "price", priceSite(), "lease", leaseSite(), "cloud/dev", cloudPerDevice, "margin", marginSite());
