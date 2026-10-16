@@ -16,21 +16,19 @@ const CUSTOMER = {
   overtimeCap: 360,       // 時間外の上限 年360時間（原則、A）
 };
 
+// Since 2026-10-16: the customer's gain is counted per device (tora_v2.js). Only the document time is in the plan;
+// rework is an upside to measure, coaching is not priced.
+const V = require("./tora_v2.js");
 function customerValue(o = {}) {
-  const a = { ...CUSTOMER, ...o };
-  const docs = a.people * a.docHoursPerMonth * 12 * a.hourlyCost;
-  const rework = a.sales * a.reworkRate * a.reworkCut;
-  const coach = a.newHires * a.coachHoursPerHire * a.coachCut * a.hourlyCost;
-  const total = docs + rework + coach;
-  const freedHours = a.people * a.docHoursPerMonth * 12;
+  const c = V.customerValue(o);
   return {
-    a, levers: [
-      { key: "docs", name: "書類・報告の時間", value: docs, formula: `${a.people}人×月${a.docHoursPerMonth}時間×12か月×4,000円` },
-      { key: "rework", name: "手戻り・施工ミス", value: rework, formula: `完成工事高${a.sales / 10000}億円×手戻り${a.reworkRate * 100}%×削減${a.reworkCut * 100}%` },
-      { key: "coach", name: "新人の指導時間", value: coach, formula: `新人${a.newHires}人×年${a.coachHoursPerHire}時間×削減${a.coachCut * 100}%×4,000円` },
+    ...c,
+    levers: [
+      { key: "docs", name: "書類・写真整理の時間", value: c.docs, formula: "10台×240日×（職長15分＋施工管理20分）", inPlan: true },
+      { key: "rework", name: "手戻り（上振れ）", value: c.rework, formula: "完成工事高30億円×2%×対象工種30%×削減20%", inPlan: false },
+      { key: "coach", name: "新人の指導", value: 0, formula: "金額にせず、独り立ちの月数で測る", inPlan: false },
     ],
-    total, multiple: total / a.price,
-    freedHours, freedPeople: freedHours / a.annualHours, capShare: a.docHoursPerMonth * 12 / a.overtimeCap,
+    total: c.docs, multiple: c.ratio, freedPeople: c.freedHours / V.WAGE.annualHours,
   };
 }
 
@@ -42,7 +40,7 @@ const NATION = {
   workers: 4770000,                // 建設業就業者 477万人（2024年）
   over55: 0.367,                   // 55歳以上 36.7%
   samCompanies: 3100,              // ターゲット市場の社数（tora_market.js）
-  somSites: 85,                    // 5年目の拠点数
+  somSites: V.run().y5.sites,      // 5年目の拠点数（81）
 };
 function nationValue(o = {}) {
   const n = { ...NATION, ...o };
@@ -54,7 +52,7 @@ function nationValue(o = {}) {
     retiring: n.workers * n.over55,
     samValue: n.samCompanies * c.total,
     somValue: n.somSites * c.total,
-    somRevenue: n.somSites * 300,
+    somRevenue: n.somSites * V.priceSite(),
   };
 }
 
@@ -63,8 +61,8 @@ module.exports = { CUSTOMER, customerValue, NATION, nationValue };
 if (require.main === module) {
   const c = customerValue();
   c.levers.forEach((l) => console.log(l.name, Math.round(l.value), "万円", l.formula));
-  console.log("合計", Math.round(c.total), "万円 / 価格の", c.multiple.toFixed(1), "倍 / 浮く時間", c.freedHours, "h =", c.freedPeople.toFixed(1), "人分 / 上限の", Math.round(c.capShare * 100), "%");
+  console.log("費用", Math.round(c.cost), "倍率", c.ratio.toFixed(2), "上振れ込み", c.ratioUp.toFixed(2), "元が取れる分", c.breakEvenMin.toFixed(1));
   const v = nationValue();
-  console.log("建設全体の手戻り", (v.reworkAll / 1e8).toFixed(2), "兆円 / 電気工事", (v.reworkElectrical / 10000).toFixed(0), "億円 / 引退予備軍", Math.round(v.retiring / 10000), "万人");
-  console.log("ターゲット市場の顧客価値", (v.samValue / 10000).toFixed(0), "億円 / 5年目に届ける価値", (v.somValue / 10000).toFixed(1), "億円 / 売上", v.somRevenue / 10000, "億円");
+  console.log("建設全体の手戻り", (v.reworkAll / 1e8).toFixed(2), "兆円 / 電気工事", (v.reworkElectrical / 10000).toFixed(0), "億円 / 55歳以上", Math.round(v.retiring / 10000), "万人");
+  console.log("5年目に届ける価値", (v.somValue / 10000).toFixed(1), "億円 / 売上", (v.somRevenue / 10000).toFixed(2), "億円");
 }

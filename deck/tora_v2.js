@@ -89,7 +89,7 @@ function team() {
 
 // ---------- 7. 拠点数・売上・損益 ----------
 const GROWTH = {
-  newSites: [3, 9, 18, 27, 33], // v1と同じ（導入担当1人＝年6拠点の上限から）
+  newSites: [3, 9, 18, 27, 33], // 導入担当1人＝年6拠点の上限から（見積）
   churnRate: 0.10,              // 年10%（見積：B2B SaaSの年間解約は大企業5〜10%・中小30〜50%。乗り換えにくさを見て中間より低め）
   contract: [600, 750, 1100, 550, 950], // 受託：連携開発・帳票カスタマイズ・教材の個別制作（件数×単価の仮置き）
   contractMargin: 1 / 3,
@@ -101,42 +101,70 @@ const GROWTH = {
     experts: [100, 120, 150, 180, 200],  // 税理士・弁護士・弁理士・社労士
     misc: [100, 120, 190, 200, 200],
   },
-  funding: 12500,
+  funding: [12500, 0, 5000, 0, 0], // 1年目：公庫1,000万＋CVC・VC 1億1,500万／3年目：シリーズA 5,000万（準備期の500万は別）
 };
+const SALES_HEADS = 3; // 5年目の営業人数
+const CSDAY = 600 * LOAD / 240; // カスタマーサクセスの日額（万円）
+
+// o: { newSites, contract, churnRate, funding, plan, perDevice, priceK, hireK (採用を拠点数に連動), salaryAdd (年収への上乗せ) }
 function run(o = {}) {
-  const g = { ...GROWTH, ...o }, T = team(), p = { ...PLAN, ...(o.plan || {}) };
+  const g = { ...GROWTH, ...o }, p = { ...PLAN, ...(o.plan || {}) };
+  if (o.priceK) { p.baseFee *= o.priceK; p.deviceFee *= o.priceK; }
   const perDev = o.perDevice ?? cloudPerDevice;
+  const T = team();
   let sites = 0, cash = 0, cum = 0;
-  return T.map((t, y) => {
+  const rows = T.map((t, y) => {
+    const planStaff = t.staff;
+    const staff = o.hireK ? 4 + Math.round((planStaff - 4) * o.hireK) : planStaff;
+    const scale = staff / planStaff;
+    const payroll = (t.payroll + (o.salaryAdd || 0) * LOAD * planStaff) * scale, recruit = t.recruit * scale;
     const open = sites, churn = y === 0 ? 0 : Math.round(open * g.churnRate), nw = g.newSites[y];
     sites = open - churn + nw;
     const trial = y === 0;
-    const stock = (open - churn) * priceSite(p);
+    const existing = (open - churn) * priceSite(p);
     const newLic = trial ? 0 : nw * priceSite(p) * 0.5;
-    const license = stock + newLic;
-    const billedSites = (open - churn) + (trial ? 0 : nw * 0.5);
-    const licCost = billedSites * cogsSite(p, perDev) + (trial ? nw * cogsSite(p, perDev) * 0.25 : 0); // 試験導入の3か月分も原価はかかる
-    const setupRev = nw * p.setup;
-    const setupLabor = nw * setupDays * (600 * LOAD / 240), setupCost = setupLabor + nw * setupTravel;
+    const license = existing + newLic;
+    const billed = (open - churn) + (trial ? 0 : nw * 0.5);
+    const licCost = billed * cogsSite(p, perDev) + (trial ? nw * cogsSite(p, perDev) * 0.25 : 0); // 試験導入の3か月分も原価はかかる
+    const setup = nw * p.setup;
+    const setupLabor = nw * setupDays * CSDAY, setupCost = setupLabor + nw * setupTravel;
     const contract = g.contract[y], contractLabor = contract * (1 - g.contractMargin);
-    const sales = license + setupRev + contract;
-    const gp = sales - licCost - setupCost - contractLabor;
+    const service = setup + contract, sales = license + service;
+    const cogs = licCost + setupCost + contractLabor, gp = sales - cogs;
     const other = Object.values(g.other).reduce((a, v) => a + v[y], 0) + ADVISORS;
-    const sga = t.payroll - setupLabor - contractLabor + t.recruit + other;
+    const transfer = setupLabor + contractLabor;
+    const sga = payroll - transfer + recruit + other;
     const op = gp - sga;
-    cum += op; cash += (y === 0 ? g.funding : 0) + op;
-    return { year: y + 1, open, churn, nw, sites, stock, newLic, license, setupRev, contract, sales, licCost, setupCost, contractLabor, gp, gpRate: gp / sales,
-      payroll: t.payroll, recruit: t.recruit, other, sga, op, cum, cash, staff: t.staff, perStaff: sga / t.staff, licMargin: 1 - licCost / license };
+    cum += op; cash += g.funding[y] + op;
+    return { year: y + 1, open, prev: open, churn, ch: churn, nw, sites, existing, stock: existing, newLic, license, setup, setupRev: setup, contract, service, sales,
+      licCost, setupCost, setupLabor, contractLabor, cogs, gp, gpRate: gp / sales, payroll, recruit, other, transfer, sga, op, cum, cash, staff,
+      perStaff: sga / staff, bep: sga / (gp / sales), sitesPerStaff: sites / staff, licMargin: license ? 1 - licCost / license : 0, funding: g.funding[y] };
   });
+  const fb = rows.find((r) => r.op > 0);
+  return { rows, firstBlack: fb ? fb.year : null, minCash: Math.min(...rows.map((r) => r.cash)), y5: rows[4], cumPeak: Math.min(...rows.map((r) => r.cum)) };
+}
+
+// 新規が計画のk割しか取れなかったら。linked＝採用も拠点数に合わせて遅らせる
+function shortfall(k, linked = true) {
+  return { k, linked, ...run({ newSites: GROWTH.newSites.map((n) => Math.round(n * k)), contract: GROWTH.contract.map((c) => c * k), hireK: linked ? k : undefined }) };
+}
+
+// 1拠点で見た損得（万円）
+function unit(p = PLAN) {
+  const gpYear = priceSite(p) - cogsSite(p);                    // 216
+  const setupGp = p.setup - (setupDays * CSDAY + setupTravel);   // 59
+  const salesPay = ROLES.find((r) => r[0].startsWith("営業"))[1] * LOAD; // 780
+  const cac = (SALES_HEADS * salesPay + GROWTH.other.ads[4]) / GROWTH.newSites[4];
+  return { gpYear, setupGp, cac, salesPay, ltv: (years) => gpYear * years + setupGp, paybackMonths: cac / (gpYear / 12) };
 }
 
 module.exports = { WAGE, H, PLAN, priceSite, leaseSite, SAVE, customerValue, CLOUD, cloudPerDevice, FULL_UPLOAD_PER_DEVICE, siteInfra, cogsSite, marginSite,
-  SETUP_TASKS, setupDays, setupTravel, ROLES, LOAD, RECRUIT_RATE, ADVISORS, team, GROWTH, run };
+  SETUP_TASKS, setupDays, setupTravel, ROLES, LOAD, RECRUIT_RATE, ADVISORS, team, GROWTH, SALES_HEADS, CSDAY, run, shortfall, unit };
 
 if (require.main === module) {
   console.log("hourly", H, "price", priceSite(), "lease", leaseSite(), "cloud/dev", cloudPerDevice, "margin", marginSite());
   for (const m of [[10, 15], [15, 20], [25, 35]]) console.log("save", m, customerValue({ electricianMin: m[0], managerMin: m[1] }));
   console.log("setupDays", setupDays);
   console.table(team().map((t) => ({ y: t.year, staff: t.staff, payroll: Math.round(t.payroll), recruit: Math.round(t.recruit) })));
-  console.table(run().map((r) => ({ y: r.year, open: r.open, ch: r.churn, nw: r.nw, sites: r.sites, sales: Math.round(r.sales), gp: Math.round(r.gp), gpr: (r.gpRate * 100).toFixed(0), lm: (r.licMargin * 100).toFixed(0), sga: Math.round(r.sga), op: Math.round(r.op), cum: Math.round(r.cum), cash: Math.round(r.cash) })));
+  console.table(run().rows.map((r) => ({ y: r.year, open: r.open, ch: r.churn, nw: r.nw, sites: r.sites, sales: Math.round(r.sales), gp: Math.round(r.gp), gpr: (r.gpRate * 100).toFixed(0), lm: (r.licMargin * 100).toFixed(0), sga: Math.round(r.sga), op: Math.round(r.op), cum: Math.round(r.cum), cash: Math.round(r.cash) })));
 }

@@ -218,40 +218,30 @@ async function setup(pres, title, notes) {
 const fmt = (v) => Math.round(v).toLocaleString("en-US");
 const tri = (v) => (v < 0 ? "▲" + fmt(-v) : fmt(v));
 
-// "黒字化の条件と撤退ライン": shortfall table (left) and go / fix / stop gates (right). Used by the proof and easy decks.
-function gates(slide, shortfall, o = {}) {
-  const top = o.top || 1.15, lw = 5.3, mil = (v) => Math.round(v / 100);
-  txt(slide, "新規拠点が計画に届かなかったら（百万円）", { x: X0, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
-  const yr = (r) => (r.firstBlack ? r.firstBlack + "年目" : "しない");
-  const rows = [1, 0.8, 0.7, 0.6, 0.5].map((k) => {
-    const a = shortfall(k, true), b = shortfall(k, false), hit = k === 0.6;
-    const c = (ok) => ({ color: ok ? K.ink : ACC, bold: hit || !ok });
-    return [{ text: k === 1 ? "計画どおり" : `計画の${k * 10}割`, bold: hit, color: hit ? ACC : K.ink }, { text: a.rows.map((r) => r.nw).join("・"), color: K.gray700 },
-      { text: yr(a), ...c(!!a.firstBlack) }, { text: String(mil(a.minCash)), ...c(a.minCash > 0) }, { text: yr(b), ...c(!!b.firstBlack) }, { text: String(mil(b.minCash)), ...c(b.minCash > 0) }];
+// "黒字化の条件と撤退ライン": shortfall table (10台 vs 15台, hiring linked) and the go / fix / stop gates. Used by every deck.
+function gates(slide, V, o = {}) {
+  const top = o.top || 1.12, mil = (v) => Math.round(v / 100);
+  const d15 = { devices: 15, mix: { cam: 12, hmd: 3 } };
+  const sc = (k, plan) => V.run({ plan, newSites: V.GROWTH.newSites.map((n) => Math.round(n * k)), contract: V.GROWTH.contract.map((c) => c * k), hireK: k < 1 ? k : undefined });
+  const yr = (r) => (r.firstBlack ? r.firstBlack + "年目" : "5年でしない");
+  const cell = (r) => [{ text: yr(r), color: r.firstBlack ? K.ink : ACC, bold: !r.firstBlack }, { text: tri(mil(r.y5.op)), color: r.y5.op < 0 ? ACC : K.ink }, { text: String(mil(r.minCash)), color: r.minCash < 0 ? ACC : K.ink }];
+  txt(slide, "新規拠点が計画に届かなかったら（採用も拠点数に合わせて遅らせる・百万円）", { x: X0, y: top, w: W, h: 0.26, size: 10, bold: true });
+  const rows = [1, 0.9, 0.8, 0.7, 0.6].map((k) => {
+    const a = sc(k), b = sc(k, d15);
+    return [{ text: k === 1 ? "計画どおり" : `計画の${k * 10}割`, bold: k === 1 }, { text: a.rows.map((r) => r.nw).join("・"), color: K.gray700 }, ...cell(a), ...cell(b)];
   });
-  txt(slide, "採用を実績に合わせる", { x: X0 + 2.5, y: top + 0.3, w: 1.4, h: 0.24, size: 8.5, bold: true, align: "center", valign: "middle", fill: K.fill });
-  txt(slide, "採用は計画どおり", { x: X0 + 3.9, y: top + 0.3, w: 1.4, h: 0.24, size: 8.5, bold: true, color: ACC, align: "center", valign: "middle", fill: K.fill });
-  table(slide, [["新規の達成度", "新規拠点（1〜5年目）", "黒字化", "最低現金", "黒字化", "最低現金"], ...rows],
-    { x: X0, y: top + 0.55, w: lw, colW: [1.05, 1.45, 0.7, 0.7, 0.7, 0.7], rowH: 0.32, size: 8.5, align: "center", strongRows: [4], name: "shortfall" });
-  box(slide, { x: X0, y: top + 2.62, w: lw, h: 0.9, fill: K.ink });
-  txt(slide, [run("読み方", { bold: true, color: "E3A774", breakLine: true }),
-    run("採用を遅らせれば、計画の6割で黒字、5割を割ると黒字にならない。", { breakLine: true }),
-    run("遅れているのに計画どおり採用すると、7割でも現金が尽きる。", { breakLine: true }),
-    run("採用は「期末で社員1人3拠点」の見込みが立ってから")], { x: X0 + 0.15, y: top + 2.64, w: lw - 0.3, h: 0.86, size: 9, color: K.paper, valign: "middle", psa: 1 });
-  const rx = 6.0, rw = 3.6;
-  txt(slide, "進む・直す・止まるの線", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
-  [["1年目末", "実証3社のうち本契約", [["2社以上", "進む", K.ink], ["1社", "値段と顧客を見直す", K.gray700], ["0社", "撤退か方向転換", ACC]]],
-   ["2年目末", "新規拠点", [["5以上", "計画どおり採用", K.ink], ["5未満", "採用を止める", ACC]]]].forEach(([when, what, opts], i) => {
-    const y = top + 0.32 + i * 1.62, h = opts.length * 0.38 + 0.36;
-    box(slide, { x: rx, y, w: rw, h, line: K.ink, lw: 1 });
-    txt(slide, [run(when + "　", { bold: true, color: ACC }), run(what, { bold: true })], { x: rx + 0.12, y: y + 0.04, w: rw - 0.24, h: 0.28, size: 9.5, valign: "middle" });
-    opts.forEach(([cond, act, c], j) => {
-      const yy = y + 0.36 + j * 0.38;
-      box(slide, { x: rx + 0.12, y: yy, w: 0.85, h: 0.32, fill: c });
-      txt(slide, cond, { x: rx + 0.12, y: yy, w: 0.85, h: 0.32, size: 9, bold: true, color: K.paper, align: "center", valign: "middle" });
-      txt(slide, "→ " + act, { x: rx + 1.05, y: yy, w: rw - 1.15, h: 0.32, size: 9.5, valign: "middle" });
-    });
-  });
+  table(slide, [["新規の達成度", "新規拠点（1〜5年目）", "黒字化", "5年目利益", "最低現金", "黒字化", "5年目利益", "最低現金"], ...rows],
+    { x: X0, y: top + 0.55, w: W, colW: [1.25, 1.75, 1.05, 1.05, 0.95, 1.05, 1.15, 0.95], rowH: 0.25, size: 8.5, align: "center", strongRows: [1], name: "shortfall" });
+  txt(slide, "1拠点10台のまま", { x: X0 + 3.0, y: top + 0.3, w: 3.05, h: 0.23, size: 8.5, bold: true, align: "center", valign: "middle", fill: K.fill });
+  txt(slide, "1拠点15台に増やせた場合", { x: X0 + 6.05, y: top + 0.3, w: 3.15, h: 0.23, size: 8.5, bold: true, color: ACC, align: "center", valign: "middle", fill: K.fill });
+  const gy = top + 2.12;
+  txt(slide, "進む・直す・止まるの線（案）", { x: X0, y: gy, w: W, h: 0.26, size: 10, bold: true });
+  table(slide, [["時期", "測るもの", "進む", "直す", "止まる"],
+    ["実証（準備期）", "1台1日の削減時間", "26分以上", "15〜26分：機能を写真台帳に絞る", "15分未満：撤退"],
+    ["1年目末", "試験導入3社の本契約", "2社以上", "1社：値段と顧客を見直す", "0社：撤退か方向転換"],
+    ["2年目末", "新規拠点・1拠点の台数", "5拠点以上・平均12台", "5拠点未満：採用を止める", "─"],
+    ["3年目", "シリーズAの交渉", "継続率90%以上", "未達：調達額と採用を絞る", "─"]],
+    { x: X0, y: gy + 0.28, w: W, colW: [1.2, 1.9, 1.6, 2.5, 2.0], rowH: 0.25, size: 8.5, leftCols: [1, 2, 3, 4], name: "gates" });
 }
 
 module.exports = { T, K, S, F, X0, W, ACC, TAGLINE, png, txt, box, hline, arrow, run, heading, table, panel, bubble, sfx, charSVG, iconSVG, setup, fmt, tri, gates };

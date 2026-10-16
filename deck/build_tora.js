@@ -12,8 +12,13 @@ const OUT = path.join(OUT_DIR, "カンツギ_事業計画書_本編.pptx");
 const { customerValue, nationValue } = require("./tora_value.js");
 const { run: model, unit, shortfall, SALES } = require("./tora_model.js");
 const PLAN = model(), PR = PLAN.rows, U = unit();
+const Y5 = PR[4], fb = PLAN.firstBlack;
+// 計算詳細版（質問用）のページ。本編の数字の式と前提はそこにある
+const DP = { value: "5〜8", price: "9〜13", device: "10", sales: "14〜16", team: "17", pl: "18", bep: "19", ltv: "20", gates: "21〜22", cash: "23", market: "24", target: "25", trial: "26" };
 const mil = (v) => Math.round(v / 100); // 万円 → 百万円
-const CV = customerValue(), NV = nationValue(), CVH = customerValue({ docHoursPerMonth: 3, reworkCut: 0.1, coachCut: 0.15 });
+const CV = customerValue(), NV = nationValue();
+const V = require("./tora_v2.js");
+const L = require("./tora_lib.js");
 const man = (v) => Math.round(v).toLocaleString("en-US");
 const LOGOS = path.join(__dirname, "../design-system/georec/logos");
 const F = T.font.sans;
@@ -50,6 +55,9 @@ function arrow(slide, x, y, w, h, o = {}) {
 const run = (text, o = {}) => ({ text, options: { fontFace: F, ...o } });
 
 const ACC = "B8692E"; // copper: the conductor of a cable; the one accent of the pitch deck
+function detailRef(slide, pages) { // 右上に「詳細版 p.○」を出す
+  txt(slide, "計算の詳細：詳細版 p." + pages, { x: 6.6, y: 0.06, w: 3.0, h: 0.2, size: 8, color: K.gray500, align: "right", valign: "middle" });
+}
 function heading(slide, title, lead) {
   const m = /^([①②③④⑤⑥⑦])\s*(.*)$/.exec(title);
   if (m) title = [run(m[1] + " ", { color: ACC }), run(m[2])];
@@ -93,20 +101,20 @@ const TAGLINE = "現場の勘を、次の担い手へ。";
 
 // ---------- notes: time slot, the slide's one message, then the script ----------
 const NOTE_PARTS = {
-  1: ["0:00 - 0:25", "人が減っても現場が迷わず回る仕組みをつくる。希望金額は500万円",
-    "株式会社カンツギです。カンツギは「勘を継ぐ」。割れた器を金で継ぐ金継ぎのように、途切れそうな現場の勘をデータで継ぎます。熟練者の勘が退職とともに消えていく現場に、スマートグラスで記録して次の担い手とAIに渡す仕組みをつくります。希望金額は500万円です。"],
+  1: ["0:00 - 0:25", "人が減っても現場が迷わず回る仕組みをつくる",
+    "株式会社カンツギです。カンツギは「勘を継ぐ」。割れた器を金で継ぐ金継ぎのように、途切れそうな現場の勘をデータで継ぎます。熟練者の勘が退職とともに消えていく現場に、スマートグラスで記録して次の担い手とAIに渡す仕組みをつくります。"],
   2: ["0:25 - 1:00", "スマートグラスで工事の作業を記録し、報告と教育を自動にするサービス",
-    "事業の概要です。何のビジネスか。施工管理者や電工がスマートグラスを着けるだけで作業を記録し、工事写真の整理と報告書づくり、若手の教育を自動にするサービスです。既存のサービスとの違いは、人が撮って入力するのではなく自動で記録し、図面と照合し、教材にまですること。お客様は、関東の中堅の電気工事会社です。収益は、1拠点あたり年300万円の利用料と、初年度の導入支援です。"],
+    "事業の概要です。何のビジネスか。施工管理者や電工がスマートグラスを着けるだけで作業を記録し、工事写真の整理と報告書づくり、若手の教育を自動にするサービスです。既存のサービスとの違いは、人が撮って入力するのではなく自動で記録し、図面と照合し、教材にまですること。お客様は、関東の中堅の電気工事会社です。収益は、会社の基盤と端末の台数に応じた利用料、標準の10台で年300万円と、初年度の導入支援です。"],
   3: ["1:00 - 1:40", "AIは事務作業の支援から、作業者の「目と手」の支援へ",
     "背景です。これまでAIは、管理者の報告書や議事録といった事務作業の効率化に使われてきました。考える・書くAIは、もう十分に実用の水準です。次は、これまで代わりが利かなかった肉体労働、とくに作業者の暗黙知を支える番です。安全・品質・施工手順の作業支援。人の目は口ほどに物を言うと言いますが、次に来るのは「見るAI」だと考えています。その入口がARグラスです。スマホ世代の次の、ARグラス世代が憧れる施工のやり方をつくります。"],
-  4: ["1:40 - 2:20", "手戻りだけで建設全体に年1.5兆円。勘の喪失は国の損失",
-    "思いだけの話ではありません。お金で見ると、建設投資は年約75兆円。手戻り、つまりやり直しの費用は、海外の研究で工事費の0.4%から6%と言われています。控えめに2%とすると、建設全体で年約1.5兆円、電気工事だけで年約2,400億円がやり直しに消えています。そして建設業で働く人の36.7%、約175万人が55歳以上です。熟練者の判断が消えると、この手戻りが増え、残業の上限の中で受けられる工事も減ります。現場の勘を残すことは、この損失を防ぐことです。"],
-  5: ["2:20 - 3:05", "残業の上限と高齢化で、書類と育成に回す人がいない",
+  4: ["1:40 - 2:25", "残業の上限と高齢化で、書類と育成に回す人がいない",
     "対象のお客様は三人です。一人目は、現場で孤軍奮闘するDX推進担当者。二人目は、施工管理者と電工。工事写真の整理と報告書に毎日追われ、聞ける熟練者もいない。三人目は、お金を出す工事部長や社長。2024年4月から建設業にも残業の上限がかかり、人を増やせない。建設業で働く人の36.7%が55歳以上、29歳以下は11.7%しかいません。"],
-  6: ["3:05 - 3:50", "1社で年4,200万円。価格の約14倍。前提を半分にしても7倍",
-    "お客様が得する額です。施工管理者と電工が100人の中堅の会社で、効果は三つ。一つ目、書類と報告の時間が1人月6時間減り、年2,880万円。二つ目、手戻りが2割減って、完成工事高30億円の会社で年1,200万円。三つ目、新人の指導時間が減って年144万円。合わせて年約4,200万円、利用料300万円の約14倍です。浮く時間は年7,200時間、3.7人分。残業の上限360時間の2割にあたる余力が、全員に生まれます。前提をすべて半分にしても、年2,100万円、7倍です。"],
-  7: ["3:50 - 4:30", "記録は自動、渡す先は三つ。データが貯まるほど真似されにくくなる",
+  5: ["2:25 - 3:05", "手戻りだけで建設全体に年1.5兆円。勘の喪失は国の損失",
+    "思いだけの話ではありません。お金で見ると、建設投資は年約75兆円。手戻り、つまりやり直しの費用は、海外の研究で工事費の0.4%から6%と言われています。控えめに2%とすると、建設全体で年約1.5兆円、電気工事だけで年約2,400億円がやり直しに消えています。そして建設業で働く人の36.7%、約175万人が55歳以上です。熟練者の判断が消えると、この手戻りが増え、残業の上限の中で受けられる工事も減ります。現場の勘を残すことは、この損失を防ぐことです。"],
+  6: ["3:05 - 3:45", "記録は自動、渡す先は三つ。データが貯まるほど真似されにくくなる",
     "解決策です。作業者の一人称の動画と会話を撮り続け、AIが整理し、若手には現物に重ねて、管理者には報告書として、次の担い手には教材として渡します。真似されにくい理由は三つ。図面に現れない現場処置の記録は、使うほど貯まり、後から来た会社には移せません。映像のどこが重要かを見分ける意味づけは、施工の経験者にしかできません。そして、電気工事の工種ごとの手順と報告書の型を、業界で最初に揃えます。"],
+  7: ["3:45 - 4:30", "1拠点10台で年約480万円。払う額の約1.4倍。1台1日26分減れば元が取れる",
+    "お客様が得する額です。得をするのは、スマートグラスを着けた班だけです。1拠点に10台、1班に1台を職長が着けます。1台で1日、職長の日報と撮影が15分、施工管理者の写真整理と写真台帳が20分減ると、統計から出した時給で、年約480万円です。お客様が払うのは、当社への年300万円と端末のリース約53万円で、約353万円。得はその約1.4倍です。逆に言うと、1台1日26分減れば元が取れます。ここを実証の合格ラインにします。手戻りの削減は、実証で測れたら上乗せし、そのときは約2.4倍です。新人の指導は金額にせず、独り立ちまでの月数で測ります。計算の過程は詳細版の5〜8ページにあります。"],
   8: ["4:30 - 5:15", "壁の図面を、手元に実物大で出す。ミスしやすい所では止める",
     "ARグラスで何が変わるか。今の現場では、2メートル近いケーブルのジョイントの組立図を、わら半紙で壁に貼って施工しています。壁を見に行き、手元に戻り、寸法を思い出して測る。この往復が、思い込みと記憶違いのミスを生みます。ARなら、実物大・立体・工程ごとの完成形を手元に出せます。過去のミス事例を学習させておけば、間違えやすい所で、赤を切るか青を切るかのように、音声とレーザーポインターで止められます。グラスは火花や異物から目を守る役目も果たします。ただし寸法の最終確認はスケールで行います。測る道具ではなく、理解して間違いに気づく道具です。"],
   9: ["5:15 - 5:55", "ベテランが解釈を教え、AIが育つ。人が抜けても資産が残る",
@@ -118,31 +126,31 @@ const NOTE_PARTS = {
   12: ["7:10 - 7:45", "施工管理アプリは「人が入力する器」。当社は「自動で記録し、判断を渡す」",
     "競合です。工事写真や施工管理のアプリは、ANDPAD、SPIDERPLUS、蔵衛門など、すでに広く使われています。ただ、どれも人が撮って入力する器です。当社は自動で記録し、図面と照合し、熟練者の判断を教材にして渡します。最大の脅威は、これらの会社がAIで自動報告を加えることです。だから競わずにつなぎます。報告書と写真は各社の形式で出力し、当社は判断の記録と教材で選ばれます。"],
   13: ["7:45 - 8:20", "ターゲット市場は約141億円。周辺市場は年7〜9%で伸びている",
-    "市場規模です。全体市場として、国内の建設テック市場は建築分野だけで2030年度に約3,040億円、年7.4%の成長です。ターゲット市場は、業種と規模で分けて数えました。電気工事と電気通信工事の中堅以上、約3,100社。顧客数かける単価かける年1回で、約141億円です。5年目に85拠点、2.55億円を取りに行きます。"],
+    "市場規模です。全体市場として、国内の建設テック市場は建築分野だけで2030年度に約3,040億円、年7.4%の成長です。ターゲット市場は、業種と規模で分けて数えました。電気工事と電気通信工事の中堅以上、約3,100社。顧客数かける単価かける年1回で、約141億円です。5年目に81拠点、約2.4億円を取りに行きます。"],
   14: ["8:20 - 8:55", "最初の顧客は関東の中堅電気工事会社。4つの物差しで選んだ",
     "なぜ最初が中堅の電気工事会社なのか。市場の大きさ、困りごとの強さ、会いに行きやすさ、波及効果の4つで比べました。中堅の電気工事会社は、市場が最も大きく、残業規制で困りごとが強く、私の施工管理の経歴がそのまま信用になります。お金を出すのは社長や工事部長、使うのは施工管理者、推進するのはDX担当。この三人それぞれに効く説明を用意します。"],
   15: ["8:55 - 9:35", "誰に・どう実現し・どう稼ぐか。ビジネスモデルを3つに分ける",
-    "ビジネスモデルを3つに分けます。戦略は、中堅電気工事会社に、書類の時間を減らし熟練者の判断を残す価値を届けること。オペレーションは、デモから2か月の導入、スマートグラスでの記録、AIの整理と当社の現場監修、報告書と教材の納品、月次の効果測定までの流れです。導入担当1人が年6拠点を立ち上げます。マネタイズは、年額前払いの利用料と、初年度の導入支援です。"],
-  16: ["9:35 - 10:15", "1拠点の生涯粗利は約1,850万円、獲得コストは約88万円",
-    "お金の流れです。お客様は1拠点あたり年300万円、初年度だけ導入支援200万円を払います。施工管理者100名の会社なら、約2.1か月で元が取れます。1拠点が生む生涯の粗利、LTVは、年255万円を保守的に7年分と、導入支援の粗利を足して約1,850万円。1拠点を獲得する費用、CACは営業3人と広告で約88万円。獲得費用は約4か月で回収できます。"],
+    "ビジネスモデルを3つに分けます。戦略は、中堅電気工事会社に、書類の時間を減らし熟練者の判断を残す価値を届けること。オペレーションは、デモから2か月の導入、スマートグラスでの記録、AIの整理と当社の現場監修、報告書と教材の納品、月次の効果測定までの流れです。導入担当1人が年6拠点を立ち上げます。マネタイズは、会社の基盤が月5万円、端末1台が月2万円の利用料を年額前払いで、初年度だけ導入支援をいただきます。"],
+  16: ["9:35 - 10:15", "会社の基盤＋端末の台数で払う。お客様は初年度約14か月、2年目からは毎年プラス",
+    `お金の流れです。お客様は、会社の基盤に月5万円、端末1台に月2万円を払います。標準の10台で年300万円。初年度だけ導入支援200万円、端末はお客様がリース会社から借ります。初年度は合わせて約553万円、得が月約40万円なので約14か月で元が取れ、2年目からは毎年、払う額より約130万円多く得をします。当社に残るのは、AIと保存の費用を引いた1拠点年${man(U.gpYear)}万円。7年分と導入支援の粗利でLTVは約${man(U.ltv(7))}万円、獲得費用CACは約${man(U.cac)}万円で、約${Math.round(U.ltv(7) / U.cac)}倍です。`],
   17: ["10:15 - 10:50", "最初の10社は、業界団体・展示会・提携で連れてくる",
-    "売り方です。関東の中堅電気工事会社、約735社に、業界団体の勉強会、電設の展示会、スマートグラスのメーカーとの提携で会いに行きます。デモを見ていただき、3か月の有償試験導入から本契約へ。会える率45%、成約率25%で、5年で約83社。さらに大手1社を目玉の事例にして、協力会社へ広げます。"],
-  18: ["10:50 - 11:25", "売上は拠点×月25万円で積み上がる。5年目は月2,400万円",
-    "売上と費用です。売上は、拠点数かける月25万円の利用料が積み上がる形です。5年目の月次売上は約2,400万円で、内訳は利用料が約1,790万円、導入支援が約550万円です。費用の中心は人件費で、1人あたり年800万円。所在地は川崎市を考えています。羽田・新幹線に近く、関東一円の電気工事会社に日帰りで出られます。家賃は1年目15坪で月20万円、5年目40坪で月50万円です。"],
-  19: ["11:25 - 11:55", "4年目に損益分岐点を超え、5年目の安全余裕率は29%",
-    "損益分岐点です。販管費を粗利率で割った損益分岐点売上は、4年目で1億6,100万円。売上1億9,000万円がこれを初めて上回ります。5年目は分岐点2億500万円に対して売上2億9,000万円で、安全余裕率は29%です。人で見ると、社員1人の販管費約690万円を1拠点の粗利255万円で割って2.7拠点。新しい拠点は初年度に半年分しか払わないので、期末の拠点数では1人3拠点が目安です。3年目は2.73で届かず、4年目は3.44で超えます。"],
+    "売り方です。関東の中堅電気工事会社、約735社に、業界団体の勉強会、電設の展示会、スマートグラスのメーカーとの提携で会いに行きます。デモを見ていただき、3か月の有償試験導入から本契約へ。中でも、電力会社や官公庁の工事が多く、手戻りが高くつく工種があり、デジタル化の素地がある会社、約180社を一次ターゲットにします。会える率と成約率をそれぞれ見積もり、1社1.3拠点と大手1社の5拠点を足して約85拠点。解約を引いた計画は81拠点です。"],
+  18: ["10:50 - 11:25", "売上は拠点×月25万円で積み上がる。解約は年10%で引く",
+    `売上と費用です。売上は、続いている拠点かける月25万円の利用料が積み上がる形で、解約は毎年10%で引いています。5年目の売上は約${man(Y5.sales / 100)}百万円、月にすると約${man(Y5.sales / 12)}万円。費用の中心は人件費で、役割ごとの年収に会社負担を足し、採用費と顧問料も入れています。所在地は川崎市を考えています。羽田・新幹線に近く、関東一円の電気工事会社に日帰りで出られます。`],
+  19: ["11:25 - 11:55", "5年目に損益分岐点を超える。目安は社員1人約4拠点",
+    `損益分岐点です。販管費を粗利率で割った損益分岐点売上は、5年目で約${man(Y5.bep / 100)}百万円。売上約${man(Y5.sales / 100)}百万円がこれを初めて上回ります。人で見ると、社員1人の販管費約${man(Y5.sga / Y5.staff)}万円を、1拠点の粗利${man(U.gpYear)}万円で割って約${(Y5.sga / Y5.staff / U.gpYear).toFixed(1)}拠点。新しい拠点は初年度に半年分しか払わないので、期末の拠点数では1人約4拠点が目安です。4年目は${PR[3].sitesPerStaff.toFixed(2)}で届かず、5年目は${Y5.sitesPerStaff.toFixed(2)}で黒字に届きます。`],
   20: ["11:55 - 12:25", "黒字倒産しない。最低残高は固定費3か月分",
-    "資金計画です。必要資金は1.5億円。今回の500万円で準備期を走り、実証の結果をもって日本政策金融公庫の創業融資1,000万円、CVCとVCから1億1,500万円を調達します。現金残高は最も薄い3年目でも6,000万円で、固定費3か月分を下回りません。利用料は年額前払い、導入支援は着手金をいただき、黒字倒産を防ぎます。正直に申し上げると、この計画は出資1億1,500万円が前提です。公庫の1,000万円だけなら、現金は1年目から足りなくなります。"],
-  21: ["12:25 - 13:00", "計画の6割取れれば黒字。届かなければ、先に決めた線で止まる",
-    "黒字化の条件です。新しいお客様が計画の何割取れたら黒字になるかを、同じ計算で確かめました。採用を実績に合わせて遅らせれば、計画の6割で5年目に黒字、7割なら4年目に黒字です。5割を下回ると黒字になりません。危ないのは、獲得が遅れているのに計画どおり採用することで、7割でも現金が尽きます。だから進むか止まるかの線を先に決めます。1年目の終わりに実証3社のうち2社以上が本契約なら進む、1社なら値段と顧客を見直す、0社なら撤退か方向転換。2年目に新しい拠点が5つに届かなければ採用を止めます。"],
+    `資金計画です。必要資金は1.8億円。準備期の約500万円は自己資金と補助金でまかない、実証の結果をもって日本政策金融公庫の創業融資1,000万円、CVCとVCから1億1,500万円、3年目に実績を示してシリーズAで5,000万円を調達します。現金残高は最も薄い年でも約${man(Math.round(PLAN.minCash / 100) * 100)}万円で、固定費3か月分を下回りません。利用料は年額前払い、導入支援は着手金をいただき、黒字倒産を防ぎます。この計画は出資が前提で、公庫の1,000万円だけなら1年目から現金が足りません。`],
+  21: ["12:25 - 13:00", "黒字の鍵は拠点数より、1拠点の台数。止まる線も先に決める",
+    "黒字化の条件です。新しいお客様が計画に届かなかった場合を、同じ計算で確かめました。1拠点10台のままだと、計画の9割を下回ると5年以内に黒字になりません。ところが、効果が出た班から台数を増やし、1拠点15台にできれば、計画の6割でも5年目に黒字です。黒字の鍵は、拠点の数より、1拠点で使ってもらう台数です。そして、進むか止まるかの線を先に決めます。実証で1台1日26分以上減れば進む、15分未満なら撤退。1年目の終わりに試験導入3社のうち2社以上が本契約なら進む、0社なら撤退か方向転換。2年目に新しい拠点が5つに届かなければ採用を止めます。"],
   22: ["13:00 - 13:35", "チームは現場と技術の両方を揃える。顧問とパートナーで弱みを補う",
-    "チームです。私は電線メーカーで地中送電線の施工管理を5年やり、独学でAIの仕組みを作ってきました。毎朝ニュースを音声で配信する仕組みも、個人で作って動かしています。ただ、私一人では足りません。技術の責任者、電気工事の施工管理経験者、カスタマーサクセスを揃え、業界の顧問、スマートグラスのメーカー、大学と組みます。"],
+    "チームです。私は電線メーカーで地中送電線の施工管理を5年やり、独学でAIの仕組みを作ってきました。毎朝ニュースを音声で配信する仕組みも、個人で作って動かしています。ただ、私一人では足りません。5年目までに、技術の責任者、エンジニア、電気工事の施工管理経験者による現場監修、導入を支えるカスタマーサクセス、営業、管理、戦略企画の21人の体制にします。社外の技術顧問と業界の顧問を置き、スマートグラスのメーカー、大学と組みます。"],
   23: ["13:35 - 13:55", "導入期・成長期を越え、成熟期には上場を目指す",
-    "成長の道筋です。導入期は電気工事会社で記録と報告の自動化をつかみ、成長期は図面との照合で黒字化し、成熟期は電線や素材の工場、フィジカルAIと海外展開で上場を目指します。"],
-  24: ["13:55 - 14:20", "500万円で、6か月以内に最初の1拠点を動かす",
-    "500万円の使い道です。試作品の開発に250万円、端末に80万円、1拠点での実証に100万円、設立と契約に40万円、予備30万円。私の給料はゼロです。3か月で試作品、6か月で実証の結果を出します。条件は10%でのご提案です。"],
+    "成長の道筋です。導入期は電気工事会社で記録と報告の自動化をつかみ、成長期は図面との照合と端末の台数の拡大で5年目に黒字化し、成熟期は電線や素材の工場、フィジカルAIと海外展開で上場を目指します。"],
+  24: ["13:55 - 14:20", "準備期の6か月で、最初の1拠点を動かす",
+    "準備期の6か月です。費用は約500万円。試作品の開発に250万円、端末に80万円、1拠点での実証に100万円、設立と契約に40万円、予備30万円です。自己資金と補助金でまかない、私の給料はゼロです。3か月で試作品、6か月で実証の結果を出し、1台1日26分減ったかどうかを確かめます。その結果を持って、公庫とベンチャーキャピタルから調達します。"],
   25: ["14:20 - 14:40", "最大のリスクは自分。だから役割と判断基準を先に決めておく",
-    "最後にリスクです。最大のリスクは、私自身が律速になること。だから役割を絞り、判断の基準を先に決めて、私がいなくても回る会社にします。日本の品質を支えてきた現場の勘を、人に依存しない形で残したい。その最初の一歩に、500万円をお願いします。"],
+    "最後にリスクです。最大のリスクは、私自身が律速になること。だから役割を絞り、判断の基準を先に決めて、私がいなくても回る会社にします。日本の品質を支えてきた現場の勘を、人に依存しない形で残したい。その最初の一歩として、6か月で最初の1拠点を動かします。"],
 };
 const NOTES = Object.fromEntries(Object.entries(NOTE_PARTS).map(([n, [t, msg, body]]) => [n, `【${t}】\n要約：${msg}\n\n${body}`]));
 const ASSETS = path.join(__dirname, "assets");
@@ -172,7 +180,7 @@ async function main() {
   pres.defineSlideMaster({ title: "GR_COVER", background: { color: K.paper }, objects: [{ image: { x: 8.15, y: 5.2, w: 1.45, h: 1.45 * 120 / 560, data: logoColor } }] });
   const add = (n) => { const s = pres.addSlide({ masterName: n === 1 ? "GR_COVER" : "GR_CONTENT" }); s.addNotes(NOTES[n]); return s; };
 
-  // ---------- Slide 1 表紙・希望金額 ----------
+  // ---------- Slide 1 表紙 ----------
   {
     const s = add(1);
     box(s, { x: 0, y: 0, w: 3.6, h: 5.625, fill: K.ink, name: "cover-panel" });
@@ -184,11 +192,11 @@ async function main() {
     txt(s, "事業計画書", { x: rx, y: 0.55, w: rw, h: 0.28, size: S.lead, color: K.gray700 });
     txt(s, "人が減っても、\n現場が迷わず回る仕組みをつくる", { x: rx, y: 0.9, w: rw, h: 0.85, size: 22, bold: true, lsm: 1.2 });
     txt(s, "スマートグラスで熟練者の作業を記録し、報告を自動にし、次の担い手とAIの教材にする", { x: rx, y: 1.85, w: rw, h: 0.5, size: 11.5 });
-    box(s, { x: rx, y: 2.6, w: rw, h: 1.3, line: ACC, lw: 2, name: "ask" });
-    txt(s, "希望金額", { x: rx + 0.2, y: 2.68, w: 2, h: 0.3, size: 12, bold: true, color: K.gray700 });
-    txt(s, "500万円", { x: rx + 0.2, y: 2.95, w: 3.2, h: 0.8, size: 44, bold: true, color: ACC, valign: "middle" });
-    txt(s, "準備期6か月の資金\n（出資）", { x: rx + 3.45, y: 3.05, w: 1.75, h: 0.6, size: 10, color: K.gray700, valign: "middle" });
-    txt(s, "志願者：＿＿＿＿＿＿＿＿＿＿", { x: rx, y: 4.25, w: rw, h: 0.3, size: 10.5, color: K.gray700 });
+    box(s, { x: rx, y: 2.6, w: rw, h: 1.3, line: ACC, lw: 2, name: "first-step" });
+    txt(s, "最初の一歩", { x: rx + 0.2, y: 2.68, w: 2, h: 0.3, size: 12, bold: true, color: K.gray700 });
+    txt(s, "6か月で1拠点を動かす", { x: rx + 0.2, y: 2.98, w: rw - 0.4, h: 0.55, size: 26, bold: true, color: ACC, valign: "middle" });
+    txt(s, "3か月で試作品、3か月で実証。合格ラインは「1台1日26分の削減」", { x: rx + 0.2, y: 3.52, w: rw - 0.4, h: 0.3, size: 10, color: K.gray700, valign: "middle" });
+    txt(s, "発表者：＿＿＿＿＿＿＿＿＿＿", { x: rx, y: 4.25, w: rw, h: 0.3, size: 10.5, color: K.gray700 });
   }
 
   // ---------- Slide 2 ①事業概要 ----------
@@ -199,7 +207,7 @@ async function main() {
       ["何のビジネス？", "施工管理者や電工がスマートグラスを着けるだけで、一人称の動画と会話を記録。AIが工事写真を整理して報告書を作り、図面と照合し、教材にするサービス"],
       ["既存の市場との違い", "施工管理アプリは人が撮って入力する器。当社は自動で記録し「照合→報告→教材」まで一続きで提供。施工経験者が中身を監修する"],
       ["誰のどんな悩みを解決する？", "関東の中堅電気工事会社。残業の上限規制と高齢化で、工事写真・報告書と若手の育成に回す時間がない。熟練者が辞めると判断が消える"],
-      ["収益構造", "1拠点あたり年300万円の利用料（基盤＋現場数＋追加機能）が毎年積み上がる。初年度だけ導入支援200万円"],
+      ["収益構造", "会社の基盤 月5万円＋端末1台 月2万円の利用料（標準10台で年300万円）が毎年積み上がる。初年度だけ導入支援200万円"],
     ];
     const cw = (W - 0.15) / 2, ch = 1.62, top = 1.15;
     q.forEach(([h, v], i) => {
@@ -266,7 +274,7 @@ async function main() {
       txt(s, items.map((v, j) => run("・" + v, { breakLine: j < items.length - 1 })), { x: x + 0.14, y: top + 0.65, w: cw - 0.28, h: ch - 0.75, size: 10, psa: 5 });
     });
     const sy = 3.62;
-    [["36.7%", "建設業で働く人のうち55歳以上（2024年）(1)"], ["11.7%", "同じく29歳以下。次の担い手が足りない (1)"], ["月45時間", "2024年4月から建設業にも残業の上限（原則）(2)"], ["月6時間", "1人あたりの書類作業の削減余地（建設業の電子化実績を準用）"]].forEach(([f, l], i) => {
+    [["36.7%", "建設業で働く人のうち55歳以上（2024年）(1)"], ["11.7%", "同じく29歳以下。次の担い手が足りない (1)"], ["月45時間", "2024年4月から建設業にも残業の上限（原則）(2)"], ["約2,000時間", "建設業の1年の総労働時間（残業込み）。全産業より約270時間長い"]].forEach(([f, l], i) => {
       const cw2 = (W - 0.3) / 4, x = X0 + i * (cw2 + 0.1);
       box(s, { x, y: sy, w: cw2, h: 1.2, fill: K.fill, name: "pain-stat-" + i });
       txt(s, f, { x: x + 0.1, y: sy + 0.08, w: cw2 - 0.2, h: 0.45, size: 20, bold: true, valign: "middle" });
@@ -278,6 +286,7 @@ async function main() {
   // ---------- Slide ②損失の大きさ ----------
   {
     const s = add(5);
+    detailRef(s, "7");
     heading(s, chap("②", "損失の大きさ ─ 手戻りだけで、建設全体に年1.5兆円"), "勘の喪失は思いの問題ではなく、お金の問題。熟練者が抜けるほど、やり直しと断る工事が増える");
     const top = 1.15, lw = 4.35;
     const big = [
@@ -303,7 +312,7 @@ async function main() {
       if (i < 3) arrow(s, rx + rw / 2, y + 0.53, 0, 0.12, { lw: 1.5 });
     });
     box(s, { x: X0, y: 4.35, w: W, h: 0.55, line: ACC, lw: 1.5 });
-    txt(s, [run("当社が5年目に届ける価値：", { bold: true, color: ACC }), run(`85拠点 × 年${man(CV.total)}万円 ＝ 年約${(NV.somValue / 1e4).toFixed(0)}億円。当社が受け取るのはその約${Math.round(NV.somRevenue / NV.somValue * 100)}%（2.55億円）`)], { x: X0 + 0.15, y: 4.35, w: W - 0.3, h: 0.55, size: 10.5, valign: "middle" });
+    txt(s, [run("当社が5年目に届ける価値：", { bold: true, color: ACC }), run(`${Y5.sites}拠点 × 年約${man(CV.docs)}万円（書類の時間だけ）＝ 年約${(NV.somValue / 1e4).toFixed(1)}億円。手戻りの削減が実測できれば上乗せ`)], { x: X0 + 0.15, y: 4.35, w: W - 0.3, h: 0.55, size: 10.5, valign: "middle" });
     txt(s, "手戻り率2%は控えめな仮定（海外研究で工事費の0.4〜6%）。建設投資は国交省の見通し、完成工事高は施工統計の二次集計", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
 
@@ -335,33 +344,30 @@ async function main() {
   // ---------- Slide ③導入効果 ----------
   {
     const s = add(7);
-    heading(s, `③ 導入効果 ─ 1社で年約${man(Math.round(CV.total / 100) * 100)}万円、価格の約${Math.round(CV.multiple)}倍`, "施工管理者と電工100人の中堅電気工事会社。効果は時間・手戻り・育成の3つ");
+    detailRef(s, DP.value);
+    heading(s, `③ 導入効果 ─ 1拠点10台で年約${man(Math.round(CV.docs / 10) * 10)}万円。払う額の約${CV.ratio.toFixed(1)}倍`, "得をするのは端末を着けた班だけ。確かな部分（書類と写真整理の時間）だけを計画に入れる");
     const top = 1.15, lw = 5.4;
-    txt(s, "1社が1年で得する額（万円）", { x: X0, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
-    const sc = (lw - 1.9) / CV.total;
-    let x0 = X0 + 1.6;
-    CV.levers.forEach((l, i) => {
-      const y = top + 0.36 + i * 0.62, w = Math.max(l.value * sc, 0.04);
-      txt(s, l.name, { x: X0, y, w: 1.55, h: 0.36, size: 9.5, bold: true, valign: "middle" });
-      box(s, { x: x0, y: y + 0.04, w, h: 0.28, fill: i === 0 ? K.gray700 : i === 1 ? K.gray500 : K.rule });
-      txt(s, man(l.value), { x: x0 + w + 0.05, y, w: 0.8, h: 0.36, size: 10.5, bold: true, valign: "middle" });
-      txt(s, l.formula, { x: X0 + 1.6, y: y + 0.34, w: lw - 1.6, h: 0.22, size: 7.5, color: K.gray700 });
-      x0 += w;
+    box(s, { x: X0, y: top, w: lw, h: 1.05, fill: K.fill });
+    txt(s, [run("式：", { bold: true, color: ACC }), run(`10台 × 年240日 ×（職長15分×${man(Math.round(V.H.electrician * 100) * 100)}円 ＋ 施工管理者20分×${man(Math.round(V.H.manager * 100) * 100)}円）`, { breakLine: true }),
+      run(`＝ 年 約${man(CV.docs)}万円`, { bold: true, fontSize: 18, color: ACC })], { x: X0 + 0.15, y: top, w: lw - 0.3, h: 1.05, size: 10, valign: "middle", psa: 3 });
+    txt(s, "時給＝統計の年収×会社負担1.16÷残業を含む年2,000時間。1台1日35分は仮説で、実証で測る", { x: X0, y: top + 1.1, w: lw, h: 0.28, size: 8, color: K.gray700 });
+    const bars = [["お客様の得（書類）", CV.docs, ACC], ["お客様が払う額", CV.cost, K.ink], ["手戻りも減れば（上振れ）", CV.docs + CV.rework, K.gray500]];
+    const sc = (lw - 2.95) / (CV.docs + CV.rework);
+    bars.forEach(([n, v, c], i) => {
+      const y = top + 1.5 + i * 0.5;
+      txt(s, n, { x: X0, y, w: 1.9, h: 0.38, size: 9.5, bold: true, valign: "middle" });
+      box(s, { x: X0 + 1.95, y: y + 0.06, w: v * sc, h: 0.26, fill: c });
+      txt(s, man(v) + "万円", { x: X0 + 2.0 + v * sc, y, w: 0.95, h: 0.38, size: 10, bold: true, valign: "middle" });
     });
-    const ty = top + 0.36 + 3 * 0.62;
-    box(s, { x: X0 + 1.6, y: ty + 0.04, w: CV.total * sc, h: 0.3, fill: ACC });
-    txt(s, "合計", { x: X0, y: ty, w: 1.55, h: 0.38, size: 10.5, bold: true, valign: "middle" });
-    txt(s, man(CV.total), { x: X0 + 1.6 + CV.total * sc + 0.05, y: ty, w: 0.8, h: 0.38, size: 12, bold: true, color: ACC, valign: "middle" });
-    box(s, { x: X0 + 1.6, y: ty + 0.5, w: 300 * sc, h: 0.2, fill: K.ink });
-    txt(s, "当社の利用料 300", { x: X0 + 1.6 + 300 * sc + 0.08, y: ty + 0.45, w: 2.0, h: 0.3, size: 9, valign: "middle" });
+    txt(s, `払う額＝当社への利用料300万円＋端末のリース約${man(V.leaseSite())}万円`, { x: X0, y: top + 3.0, w: lw, h: 0.25, size: 8, color: K.gray700 });
     const rx = 6.1, rw = 3.5;
-    box(s, { x: rx, y: top, w: rw, h: 1.45, fill: K.ink });
-    txt(s, [run("浮く時間", { bold: true, color: "E3A774", breakLine: true }), run(`年${man(CV.freedHours)}時間 ＝ ${CV.freedPeople.toFixed(1)}人分`, { bold: true, fontSize: 15, breakLine: true }), run(`1人あたり年72時間＝残業上限360時間の${Math.round(CV.capShare * 100)}%の余力`, { fontSize: 9 })], { x: rx + 0.15, y: top + 0.05, w: rw - 0.3, h: 1.35, size: 10, color: K.paper, valign: "middle", psa: 3 });
-    box(s, { x: rx, y: top + 1.6, w: rw, h: 1.3, fill: K.fill });
-    txt(s, [run("前提をすべて半分にしても", { bold: true, breakLine: true }), run(`年${man(CVH.total)}万円・約${Math.round(CVH.multiple)}倍`, { bold: true, fontSize: 15, color: ACC, breakLine: true }), run("削減時間 月3時間・手戻り削減10%・指導削減15%", { fontSize: 8.5, color: K.gray700 })], { x: rx + 0.15, y: top + 1.65, w: rw - 0.3, h: 1.2, size: 10, valign: "middle", psa: 2 });
-    box(s, { x: X0, y: 4.25, w: W, h: 0.65, line: ACC, lw: 1.5 });
-    txt(s, [run("言い方：", { bold: true, color: ACC }), run("「年300万円で、書類の時間・やり直し・新人の指導を合わせて年4,200万円分減らします。浮いた3.7人分で、断っていた工事を受けられます」")], { x: X0 + 0.15, y: 4.25, w: W - 0.3, h: 0.65, size: 10, valign: "middle" });
-    txt(s, "時間は人件費換算で、現金が減るのは残業代の削減や受注の増加として表れたとき。手戻り率2%・削減20%・完成工事高30億円は仮定で、実証で測る", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
+    box(s, { x: rx, y: top, w: rw, h: 1.5, fill: K.ink });
+    txt(s, [run("元が取れる条件", { bold: true, color: "E3A774", breakLine: true }), run(`1台1日 ${Math.round(CV.breakEvenMin)}分`, { bold: true, fontSize: 20, breakLine: true }), run("想定は35分。実証の合格ラインにする", { fontSize: 9 })], { x: rx + 0.15, y: top, w: rw - 0.3, h: 1.5, size: 10, color: K.paper, valign: "middle", psa: 3 });
+    box(s, { x: rx, y: top + 1.62, w: rw, h: 1.63, fill: K.fill });
+    txt(s, [run("計画に入れない2つ", { bold: true, breakLine: true }), run(`手戻り：年${man(CV.rework)}万円（30億円×2%×対象工種30%×削減20%）。実測できれば約${CV.ratioUp.toFixed(1)}倍`, { fontSize: 9, breakLine: true }),
+      run("新人の指導：金額にせず、独り立ちまでの月数で測る", { fontSize: 9 })], { x: rx + 0.15, y: top + 1.62, w: rw - 0.3, h: 1.63, size: 10, valign: "middle", psa: 4 });
+    box(s, { x: X0, y: 4.5, w: W, h: 0.42, line: ACC, lw: 1.5 });
+    txt(s, [run("言い方：", { bold: true, color: ACC }), run(`「1台1日${Math.round(CV.breakEvenMin)}分減れば元が取れます。想定は35分。手戻りも減れば約${CV.ratioUp.toFixed(1)}倍です」`)], { x: X0 + 0.15, y: 4.5, w: W - 0.3, h: 0.42, size: 10, valign: "middle" });
   }
 
   // ---------- Slide ③手元AR ----------
@@ -470,6 +476,7 @@ async function main() {
   // ---------- Slide ③端末戦略 ----------
   {
     const s = add(11);
+    detailRef(s, DP.device + "・" + DP.trial);
     heading(s, "③ 端末 ─ グラスは作らず、選べる設計にする", "当社が作るのはアプリ・AI・データ基盤。端末は市販品を現場仕様にして使い、世代が進めば乗り換える");
     const top = 1.15, lw = 4.2;
     txt(s, "現場で使える端末の条件", { x: X0, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
@@ -558,6 +565,7 @@ async function main() {
   // ---------- Slide 7 ④市場規模 ----------
   {
     const s = add(13);
+    detailRef(s, DP.market);
     heading(s, chap("④", "市場規模 ─ ターゲット市場は約141億円"), "全体市場（年7〜9%成長）→ ターゲット市場（顧客数×単価×年1回）→ 自社が狙う市場");
     const cx = 2.3, cy = 3.05;
     s.addShape("ellipse", { x: cx - 1.9, y: cy - 1.85, w: 3.8, h: 3.7, fill: { color: K.fill }, line: { color: K.gray500, width: 1 }, objectName: "tam" });
@@ -565,7 +573,7 @@ async function main() {
     s.addShape("ellipse", { x: cx - 0.6, y: cy + 0.35, w: 1.2, h: 1.2, fill: { color: K.ink }, line: { type: "none" }, objectName: "som" });
     txt(s, [run("全体市場", { bold: true, breakLine: true }), run("建設テック＋スマートファクトリー", { fontSize: 8.5 })], { x: cx - 1.6, y: cy - 1.7, w: 3.2, h: 0.6, size: 11, align: "center" });
     txt(s, [run("ターゲット市場", { bold: true, breakLine: true }), run("約141億円", { bold: true, breakLine: true }), run("約3,100社", { fontSize: 8.5 })], { x: cx - 1.1, y: cy - 0.62, w: 2.2, h: 0.8, size: 11, color: K.paper, align: "center" });
-    txt(s, [run("自社", { bold: true, breakLine: true }), run("2.55億円", { fontSize: 9 })], { x: cx - 0.6, y: cy + 0.55, w: 1.2, h: 0.8, size: 10.5, color: K.paper, align: "center", valign: "middle" });
+    txt(s, [run("自社", { bold: true, breakLine: true }), run(`${(Y5.sites * 300 / 1e4).toFixed(2)}億円`, { fontSize: 9 })], { x: cx - 0.6, y: cy + 0.55, w: 1.2, h: 0.8, size: 10.5, color: K.paper, align: "center", valign: "middle" });
     const rx = 4.7, rw = 4.9;
     txt(s, "ターゲット市場の数え方（顧客数×年額、億円）", { x: rx, y: 1.15, w: rw, h: 0.26, size: 10.5, bold: true });
     table(s, [
@@ -580,7 +588,7 @@ async function main() {
       run("全体市場の伸び", { bold: true, fontSize: 10.5, breakLine: true }),
       run("国内建設テック（建築分野）：1,845億円→3,043億円、年7.4%（2023→2030年度）(1)", { breakLine: true }),
       run("国内スマートファクトリー：42億→92億米ドル、年9.03%（2025→2034年）(2)", { breakLine: true }),
-      run("自社が狙う市場：5年目85拠点×年300万円＝2.55億円（ターゲット市場の約1.8%）"),
+      run(`自社が狙う市場：5年目${Y5.sites}拠点×年300万円＝約${(Y5.sites * 300 / 1e4).toFixed(2)}億円（ターゲット市場の約${(Y5.sites * 300 / 141e2).toFixed(1)}%）`),
     ], { x: rx + 0.15, y: 3.35, w: rw - 0.3, h: 1.28, size: 8.5, color: K.paper, psa: 2, valign: "middle" });
     txt(s, "(1) 矢野経済研究所 プレスリリースNo.3789（2025年4月）　(2) IMARC Group「Japan Smart Factory Market」　社数：電気工事業の許可業者65,497社（令和7年3月末、国土交通省）から規模別に推計（内訳は仮定）", { x: X0, y: 4.9, w: W, h: 0.3, size: S.note, color: K.gray500 });
   }
@@ -588,6 +596,7 @@ async function main() {
   // ---------- Slide 8 ④ターゲット ----------
   {
     const s = add(14);
+    detailRef(s, DP.target);
     heading(s, chap("④", "ターゲット ─ 最初の顧客は関東の中堅電気工事会社"), "市場の大きさ・困りごとの強さ・会いに行きやすさ・波及効果の4つで選んだ");
     const top = 1.15;
     txt(s, "セグメントの評価（5点満点）", { x: X0, y: top, w: 5.3, h: 0.26, size: 10.5, bold: true });
@@ -623,6 +632,7 @@ async function main() {
   // ---------- Slide 9 ⑤ビジネスモデルの3要素 ----------
   {
     const s = add(15);
+    detailRef(s, DP.price);
     heading(s, "⑤ ビジネスモデル ─ 誰に・どう実現し・どう稼ぐか", "戦略モデル（顧客価値）・オペレーションモデル（実現の方法）・マネタイズモデル（収益の方法）");
     const top = 1.12, lw = 1.6;
     const row = (y, h, title, sub) => {
@@ -645,23 +655,19 @@ async function main() {
       { x: sx, y: oy + 1.02, w: W - lw - 0.15, colW: [2.4, 5.05], rowH: 0.25, size: 8, leftCols: [1], name: "ops" });
     const my = oy + oh + 0.1;
     row(my, 0.85, "マネタイズ", "どう稼ぐ・いつ");
-    txt(s, [run("年300万円の利用料（年額前払い）", { bold: true }), run("＋初年度だけ導入支援200万円（着手金50%）", { breakLine: true }), run("お客様は約2.1か月で回収。当社は社員1人3拠点を超える4年目に黒字")], { x: X0 + lw + 0.15, y: my, w: W - lw - 0.15, h: 0.85, size: 10, valign: "middle", psa: 3 });
+    txt(s, [run("基盤 月5万円＋端末 月2万円×台数（標準10台で年300万円・年額前払い）", { bold: true }), run("＋初年度だけ導入支援200万円（着手金50%）", { breakLine: true }), run(`お客様は1台1日${Math.round(CV.breakEvenMin)}分減れば元が取れる。当社は${fb}年目に黒字`)], { x: X0 + lw + 0.15, y: my, w: W - lw - 0.15, h: 0.85, size: 10, valign: "middle", psa: 3 });
   }
 
   // ---------- Slide 4 収益の仕組み ----------
   {
     const s = add(16);
-    heading(s, "⑤ 収益モデル ─ 年300万円、約2か月で元が取れる", "当社の収入は、毎年積み上がる利用料と、初年度だけの導入支援の二本");
+    detailRef(s, DP.price + "・" + DP.ltv);
+    heading(s, "⑤ 収益モデル ─ 「会社の基盤」＋「端末の台数」で払う", "毎年積み上がる利用料と、初年度だけの導入支援の二本。端末本体はお客様がリース");
     const lx = X0, lw = 4.45, top = 1.15;
-    txt(s, "1拠点が払う金額（万円）", { x: lx, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
-    const k = (lw - 1.05) / 500;
-    const segs = [
-      ["基盤", 100, K.ink, K.paper],
-      ["ライン登録", 100, K.gray700, K.paper],
-      ["追加機能", 100, K.gray500, K.ink],
-      ["導入支援", 200, K.paper, K.ink],
-    ];
-    [["初年度", 500, segs], ["2年目以降", 300, segs.slice(0, 3)]].forEach(([lab, total, ss], r) => {
+    txt(s, "1拠点（10台）が当社に払う金額（万円）", { x: lx, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
+    const k = (lw - 1.3) / 500;
+    const segs = [["基盤", 60, K.ink, K.paper], ["端末×10台", 240, K.gray700, K.paper], ["導入支援", 200, K.paper, K.ink]];
+    [["初年度", 500, segs], ["2年目以降", 300, segs.slice(0, 2)]].forEach(([lab, total, ss], r) => {
       const y = top + 0.36 + r * 0.56;
       txt(s, lab, { x: lx, y, w: 0.85, h: 0.42, size: 9.5, bold: true, valign: "middle" });
       let x = lx + 0.85;
@@ -674,52 +680,55 @@ async function main() {
     });
     const dy = top + 1.55;
     [
-      ["基盤", "100万円／年", "アプリと現場データ基盤の利用料（1拠点）"],
-      ["ライン登録", "20万円×5ライン", "記録の対象にする工区・現場の数に比例"],
-      ["追加機能", "50万円×2本", "教材制作（KNACK）・危険表示（SAFE）など、選んだ数に比例"],
-      ["導入支援", "200万円（初年度のみ）", "当社の担当者が約2か月、現場に入る作業"],
+      ["基盤", "月5万円／拠点", "会社ごとのデータ保管庫・管理画面・図面と手順の登録・月次の効果レポート"],
+      ["端末ライセンス", "月2万円／台", "記録→写真の自動抽出→日報・写真台帳。録画は月80時間まで"],
+      ["端末本体", "当社の売上外", `お客様がリース（カメラ8台＋HMD2台で年約${man(V.leaseSite())}万円）`],
+      ["導入支援", "200万円（初年度）", "当社の担当者が約2か月・42人日、現場に入る"],
     ].forEach(([n, p, d], i) => {
       const y = dy + i * 0.36;
       hline(s, lx, y, lw, K.rule, T.stroke.rule);
       txt(s, [run(n, { bold: true, breakLine: true }), run(p, { fontSize: 8, color: K.gray700 })], { x: lx, y: y + 0.02, w: 1.45, h: 0.34, size: 9, valign: "middle" });
-      txt(s, d, { x: lx + 1.5, y, w: lw - 1.5, h: 0.36, size: 9, valign: "middle" });
+      txt(s, d, { x: lx + 1.5, y, w: lw - 1.5, h: 0.36, size: 8.5, valign: "middle" });
     });
     hline(s, lx, dy + 4 * 0.36, lw, K.rule, T.stroke.rule);
-    box(s, { x: lx, y: dy + 1.52, w: lw, h: 0.72, fill: K.ink });
-    txt(s, [run(`LTV 約${man(U.ltv(7))}万円`, { bold: true }), run(`（年粗利255万円×保守的に7年＋導入支援の粗利${man(U.setupGp)}万円）`, { breakLine: true }), run(`CAC 約${man(U.cac)}万円`, { bold: true }), run(`（営業${SALES}人${man(SALES * 800)}万円＋広告500万円）÷新規33拠点`, { breakLine: true }), run(`LTV/CAC 約${Math.round(U.ltv(7) / U.cac)}倍・獲得費用は約${Math.round(U.paybackMonths)}か月で回収`, { bold: true })], { x: lx + 0.12, y: dy + 1.52, w: lw - 0.24, h: 0.72, size: 8, color: K.paper, valign: "middle", psa: 1 });
+    box(s, { x: lx, y: dy + 1.52, w: lw, h: 0.78, fill: K.ink });
+    txt(s, [run(`1拠点の粗利 年${man(U.gpYear)}万円`, { bold: true }), run(`（300万円−AI・保存${man(V.cogsSite())}万円＝粗利率${Math.round(V.marginSite() * 100)}%）`, { breakLine: true }),
+      run(`LTV 約${man(U.ltv(7))}万円`, { bold: true }), run(`（${man(U.gpYear)}万円×7年＋導入支援の粗利${man(U.setupGp)}万円）`, { breakLine: true }),
+      run(`CAC 約${man(U.cac)}万円`, { bold: true }), run(`（営業${SALES}人${man(SALES * U.salesPay)}万円＋広告500万円）÷新規33拠点　LTV/CAC 約${Math.round(U.ltv(7) / U.cac)}倍`)],
+      { x: lx + 0.12, y: dy + 1.52, w: lw - 0.24, h: 0.78, size: 8, color: K.paper, valign: "middle", psa: 1 });
 
-    // ROI line chart (customer view)
     const rx = 5.05, rw = 4.55;
-    txt(s, "顧客から見た回収（対象者100名の拠点・万円）", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
-    const months = Array.from({ length: 13 }, (_, m) => String(m));
-    const effect = Array.from({ length: 13 }, (_, m) => m * 240);
-    const cost = Array.from({ length: 13 }, () => 500);
+    txt(s, "お客様から見た回収（1拠点10台・累計・万円）", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
+    const months = Array.from({ length: 25 }, (_, m) => String(m));
+    const gain = Array.from({ length: 25 }, (_, m) => Math.round(m * CV.docs / 12));
+    const firstYear = CV.cost + V.PLAN.setup;
+    const cost = Array.from({ length: 25 }, (_, m) => Math.round(m < 12 ? firstYear : firstYear + CV.cost));
     const axis = { catAxisLabelColor: K.gray700, valAxisLabelColor: K.gray700, catAxisLabelFontSize: 8, valAxisLabelFontSize: 8,
       catAxisLabelFontFace: "+mn-lt", valAxisLabelFontFace: "+mn-lt", valGridLine: { color: K.rule, size: 0.5 }, catGridLine: { style: "none" },
-      valAxisMinVal: 0, valAxisMaxVal: 3000, valAxisMajorUnit: 500, catAxisLineShow: true, valAxisLineShow: false, showLegend: false };
+      valAxisMinVal: 0, valAxisMaxVal: 1000, valAxisMajorUnit: 200, catAxisLineShow: true, valAxisLineShow: false, showLegend: false };
     s.addChart([
-      { type: pres.charts.LINE, data: [{ name: "浮いた工数の累計", labels: months, values: effect }], options: { chartColors: [K.ink], lineSize: 3, lineDataSymbol: "circle", lineDataSymbolSize: 5 } },
-      { type: pres.charts.LINE, data: [{ name: "初年度費用", labels: months, values: cost }], options: { chartColors: [K.gray500], lineSize: 2, lineDash: "dash", lineDataSymbol: "none" } },
-    ], { x: rx, y: top + 0.28, w: rw, h: 2.62, ...axis, objectName: "roi-chart" });
-    txt(s, "← 約2.1か月で回収", { x: rx + 1.05, y: top + 2.3, w: 1.6, h: 0.22, size: 9.5, bold: true });
-    txt(s, "初年度費用 500万円", { x: rx + 2.85, y: top + 2.3, w: 1.6, h: 0.22, size: 8.5, color: K.gray700 });
-    txt(s, "浮いた工数の累計：12か月で2,880万円（5.8倍）", { x: rx + 0.65, y: top + 0.4, w: 3.6, h: 0.26, size: 10, bold: true });
-    txt(s, "横軸は経過月数。時間単価4,000円（780万円÷1,950h）×月6h×100名＝月240万円。月6hは日報・進捗報告などの書類作業の削減分で、建設業の書類電子化実績（月6.5h）を準用した仮定", { x: rx, y: top + 2.94, w: rw, h: 0.5, size: S.note, color: K.gray700 });
+      { type: pres.charts.LINE, data: [{ name: "得の累計", labels: months, values: gain }], options: { chartColors: [ACC], lineSize: 3, lineDataSymbol: "none" } },
+      { type: pres.charts.LINE, data: [{ name: "払った額の累計", labels: months, values: cost }], options: { chartColors: [K.ink], lineSize: 2, lineDash: "dash", lineDataSymbol: "none" } },
+    ], { x: rx, y: top + 0.28, w: rw, h: 2.5, ...axis, objectName: "roi-chart" });
+    txt(s, [run("━ 得の累計", { bold: true, color: ACC }), run("　┅ 払った額の累計（横軸は月）", { color: K.gray700 })], { x: rx + 0.5, y: top + 0.32, w: 3.5, h: 0.22, size: 8.5 });
+    txt(s, `初年度 約${man(firstYear)}万円（利用料300＋導入支援200＋リース${man(V.leaseSite())}）÷ 月約${man(CV.docs / 12)}万円 ＝ 約${Math.round(firstYear / (CV.docs / 12))}か月で回収。2年目からは毎年 得${man(CV.docs)}万円／払う${man(CV.cost)}万円`, { x: rx, y: top + 2.82, w: rw, h: 0.5, size: 8.5, bold: true });
+    txt(s, `月約${man(CV.docs / 12)}万円＝10台×20日×（職長15分＋施工管理者20分）。手戻りも実測できれば約${Math.round(firstYear / ((CV.docs + CV.rework) / 12))}か月で回収`, { x: rx, y: top + 3.35, w: rw, h: 0.4, size: S.note, color: K.gray700 });
   }
 
   // ---------- Slide 11 ⑤売り方 ----------
   {
     const s = add(17);
+    detailRef(s, DP.target + "・" + DP.sales);
     heading(s, "⑤ 売り方 ─ 最初の10社は、業界団体・展示会・提携で連れてくる", "デモ → 3か月の有償試験導入 → 本契約。大手1社を目玉の事例にして協力会社へ広げる");
     const top = 1.15, lw = 4.2;
     txt(s, "5年間の積み上げ（顧客側から）", { x: X0, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
-    const fun = [["中堅の電気工事会社", "2,100社", 1.0], ["うち関東（35%）", "735社", 0.82], ["会える（45%）", "331社", 0.62], ["本契約（25%）", "83社", 0.42]];
+    const fun = [["関東の中堅電気工事会社", "735社", 1.0], ["4つの条件に合う（約25%）", "180社", 0.82], ["会える（60%）", "108社", 0.62], ["本契約（30%）", "32社", 0.42]];
     fun.forEach(([a, b, k], i) => {
       const y = top + 0.35 + i * 0.5, w = lw * k, x = X0 + (lw - w) / 2;
       box(s, { x, y, w, h: 0.42, fill: i === 3 ? ACC : i === 0 ? K.gray500 : K.gray700 });
       txt(s, [run(a + "  "), run(b, { bold: true })], { x, y, w, h: 0.42, size: 9.5, color: K.paper, align: "center", valign: "middle" });
     });
-    txt(s, [run("＋ 大手1社（支店5拠点）", { bold: true, breakLine: true }), run("＝ 約88拠点。計画の85拠点はこれより控えめ")], { x: X0, y: top + 2.4, w: lw, h: 0.5, size: 9.5, align: "center" });
+    txt(s, [run("＋ それ以外555社から29社（会える35%・本契約15%）", { bold: true, breakLine: true }), run(`×1社1.3拠点＋大手1社5拠点＝約85拠点。解約を引いた計画は${Y5.sites}拠点`)], { x: X0, y: top + 2.4, w: lw, h: 0.5, size: 9.5, align: "center" });
     const rx = 4.85, rw = 4.75;
     txt(s, "接点と役割", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
     table(s, [["接点", "何をするか"],
@@ -738,13 +747,14 @@ async function main() {
     });
     box(s, { x: X0, y: 4.3, w: W, h: 0.55, fill: K.ink });
     txt(s, [run("最初の10社：", { bold: true, color: "E3A774" }), run("準備期に有償試験3社 → 1年目に本契約3社＋試験導入 → 2年目に累計12拠点。商談期間は4〜6か月を見込む")], { x: X0 + 0.15, y: 4.3, w: W - 0.3, h: 0.55, size: 9.5, color: K.paper, valign: "middle" });
-    txt(s, "会える率45%・成約率25%は仮定。最初の3社で実測し、計画を更新する", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
+    txt(s, "4つの条件：施工管理者30人以上・電力や官公庁の工事が多い・手戻りが高くつく工種がある・デジタル化の素地。率はすべて仮定で、最初の3社で実測する", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
 
   // ---------- Slide 9 ⑥売上予測・費用 ----------
   {
     const s = add(18);
-    heading(s, chap("⑥", "売上予測 ─ 拠点×月25万円。5年目は月2,400万円"), "利用料が毎年積み上がり、導入支援と受託開発は新規拠点の数に比例する");
+    detailRef(s, DP.sales + "・" + DP.pl);
+    heading(s, chap("⑥", `売上予測 ─ 拠点×月25万円。5年目は月約${man(Math.round(Y5.sales / 12 / 10) * 10)}万円`), "利用料が毎年積み上がり（解約は年10%で引く）、導入支援と受託開発は新規拠点の数に比例する");
     const years = ["1年目", "2年目", "3年目", "4年目", "5年目"];
     const gx = X0, gw = 4.45, top = 1.15;
     txt(s, "成長曲線（百万円）", { x: gx, y: top, w: gw, h: 0.26, size: 10.5, bold: true });
@@ -755,14 +765,14 @@ async function main() {
       { type: pres.charts.LINE, data: [{ name: "累積営業損益", labels: years, values: PR.map((r) => mil(r.cum)) }], options: { chartColors: [K.gray500], lineSize: 2, lineDash: "dash", lineDataSymbol: "none", showValue: false } },
     ], { x: gx, y: top + 0.28, w: gw, h: 2.3, catAxisLabelColor: K.gray700, valAxisLabelColor: K.gray700, catAxisLabelFontSize: 9, valAxisLabelFontSize: 8,
       catAxisLabelFontFace: "+mn-lt", valAxisLabelFontFace: "+mn-lt", valGridLine: { color: K.rule, size: 0.5 }, catGridLine: { style: "none" },
-      valAxisMinVal: -100, valAxisMaxVal: 300, valAxisMajorUnit: 50, valAxisLineShow: false, showLegend: false,
+      valAxisMinVal: -150, valAxisMaxVal: 300, valAxisMajorUnit: 50, valAxisLineShow: false, showLegend: false,
       dataLabelFontSize: 8, dataLabelFontFace: "+mn-lt", dataLabelColor: K.ink, dataLabelPosition: "t", catAxisLabelPos: "low", objectName: "growth-chart" });
     box(s, { x: gx, y: 3.85, w: gw, h: 1.05, fill: K.ink, name: "monthly" });
     txt(s, [
-      run("月次売上の根拠（5年目の月平均 約2,420万円）", { bold: true, fontSize: 10, breakLine: true }),
-      run("利用料 約1,790万円 ＝ 月25万円×平均約72拠点", { breakLine: true }),
-      run("導入支援 約550万円 ＝ 200万円×月2.75拠点（新規33拠点÷12）", { breakLine: true }),
-      run("受託開発 約80万円"),
+      run(`月次売上の根拠（5年目の月平均 約${man(Y5.sales / 12)}万円）`, { bold: true, fontSize: 10, breakLine: true }),
+      run(`利用料 約${man(Y5.license / 12)}万円 ＝ 月25万円×（継続${Y5.prev - Y5.ch}拠点＋新規${Y5.nw}拠点×半年）`, { breakLine: true }),
+      run(`導入支援 約${man(Y5.setup / 12)}万円 ＝ 200万円×新規${Y5.nw}拠点÷12`, { breakLine: true }),
+      run(`受託開発 約${man(Y5.contract / 12)}万円`),
     ], { x: gx + 0.15, y: 3.88, w: gw - 0.3, h: 1.0, size: 8.5, color: K.paper, psa: 1 });
 
     const rx = 5.05, rw = 4.55;
@@ -770,23 +780,25 @@ async function main() {
     table(s, [
       ["", "1年目", "3年目", "5年目"],
       ["社員数", ...[0, 2, 4].map((i) => PR[i].staff + "名")],
-      ["人件費（販管費分）", ...[0, 2, 4].map((i) => man(PR[i].payroll - PR[i].transfer))],
-      ["家賃", "240", "360", "600"],
-      ["広告・展示会", "200", "300", "500"],
-      ["交通・出張（現場導入）", "360", "600", "1,000"],
-      ["端末・ツール", "200", "300", "400"],
-      ["専門家（税理士・弁護士・弁理士）", "100", "150", "200"],
-      ["雑費", "100", "190", "200"],
+      ["人件費（販管費分・会社負担込み）", ...[0, 2, 4].map((i) => man(PR[i].payroll - PR[i].transfer))],
+      ["採用費", ...[0, 2, 4].map((i) => man(PR[i].recruit))],
+      ["オフィス（賃料＋共益費）", ...[0, 2, 4].map((i) => man(V.GROWTH.other.office[i]))],
+      ["広告・展示会", ...[0, 2, 4].map((i) => man(V.GROWTH.other.ads[i]))],
+      ["交通（営業・定着支援）", ...[0, 2, 4].map((i) => man(V.GROWTH.other.travel[i]))],
+      ["端末・ツール", ...[0, 2, 4].map((i) => man(V.GROWTH.other.tools[i]))],
+      ["専門家・社外顧問", ...[0, 2, 4].map((i) => man(V.GROWTH.other.experts[i] + V.ADVISORS))],
+      ["雑費", ...[0, 2, 4].map((i) => man(V.GROWTH.other.misc[i]))],
       ["販管費 合計", ...[0, 2, 4].map((i) => man(PR[i].sga))],
-    ], { x: rx, y: top + 0.3, w: rw, colW: [2.05, 0.83, 0.83, 0.84], rowH: 0.3, size: 8, strongRows: [9], name: "costs" });
-    txt(s, "所在地案：川崎市（関東一円へ日帰り）。家賃は1年目15坪・月20万円、5年目40坪・月50万円。人件費は1人年800万円。導入支援に回った分は原価へ", { x: rx, y: 4.6, w: rw, h: 0.4, size: S.note, color: K.gray500 });
-    txt(s, "売上の内訳：既存顧客の利用料（前年末拠点×300万円）＋新規の利用料（新規×300万円×0.5）＋導入支援（新規×200万円）＋受託開発", { x: X0, y: 5.04, w: W, h: 0.22, size: S.note, color: K.gray500 });
+    ], { x: rx, y: top + 0.3, w: rw, colW: [2.05, 0.83, 0.83, 0.84], rowH: 0.27, size: 8, strongRows: [10], name: "costs" });
+    txt(s, "所在地案：川崎市（関東一円へ日帰り）。人件費は役割別の年収×1.2。導入支援・受託に回った人件費は原価へ", { x: rx, y: 4.6, w: rw, h: 0.4, size: S.note, color: K.gray500 });
+    txt(s, "売上の内訳：既存顧客の利用料（（前年末拠点−解約）×300万円）＋新規の利用料（新規×300万円×0.5）＋導入支援（新規×200万円）＋受託開発", { x: X0, y: 5.04, w: W, h: 0.22, size: S.note, color: K.gray500 });
   }
 
   // ---------- Slide 10 ⑥損益分岐点 ----------
   {
     const s = add(19);
-    heading(s, chap("⑥", "損益分岐点 ─ 4年目に超え、5年目の余裕率は29%"), "損益分岐点売上＝販管費（固定費）÷粗利率");
+    detailRef(s, DP.bep);
+    heading(s, chap("⑥", `損益分岐点 ─ ${fb}年目に超え、余裕率は${Math.round((1 - Y5.bep / Y5.sales) * 100)}%`), "損益分岐点売上＝販管費（固定費）÷粗利率");
     const years = ["1年目", "2年目", "3年目", "4年目", "5年目"];
     const gx = X0, gw = 5.2, top = 1.15;
     txt(s, [run("━ 実際の売上", { bold: true }), run("　┅ 損益分岐点売上（百万円）", { color: K.gray700 })], { x: gx, y: top, w: gw, h: 0.26, size: 8.5, valign: "middle" });
@@ -809,9 +821,9 @@ async function main() {
     box(s, { x: rx, y: top + 2.25, w: rw, h: 1.33, fill: K.ink, name: "bep-people" });
     txt(s, [
       run("人で見た損益分岐", { bold: true, fontSize: 10.5, breakLine: true }),
-      run(`販管費／人 ${man(PR[3].sga / PR[3].staff)}万円 ÷ 粗利／拠点 255万円 ＝ ${(PR[3].sga / PR[3].staff / 255).toFixed(1)}`, { breakLine: true }),
-      run("新規は初年度半額 → 期末で1人3拠点が目安", { bold: true, breakLine: true }),
-      run(`3年目 ${PR[2].sitesPerStaff.toFixed(2)}（未達）→ 4年目 ${PR[3].sitesPerStaff.toFixed(2)}（超過）`),
+      run(`販管費／人 ${man(Y5.sga / Y5.staff)}万円 ÷ 粗利／拠点 ${man(U.gpYear)}万円 ＝ ${(Y5.sga / Y5.staff / U.gpYear).toFixed(1)}`, { breakLine: true }),
+      run("新規は初年度半額 → 期末で1人約4拠点が目安", { bold: true, breakLine: true }),
+      run(`4年目 ${PR[3].sitesPerStaff.toFixed(2)}（未達）→ 5年目 ${Y5.sitesPerStaff.toFixed(2)}（黒字）`),
     ], { x: rx + 0.15, y: top + 2.3, w: rw - 0.3, h: 1.25, size: 9, color: K.paper, psa: 2 });
     txt(s, `安全余裕率＝（売上−損益分岐点売上）÷売上。1〜2年目の損益分岐点売上は${mil(PR[0].bep)}・${mil(PR[1].bep)}百万円（売上${mil(PR[0].sales)}・${mil(PR[1].sales)}百万円）`, { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
@@ -819,17 +831,19 @@ async function main() {
   // ---------- Slide 10 資金計画・黒字倒産対策 ----------
   {
     const s = add(20);
-    heading(s, "⑥ 資金計画・CF ─ 黒字倒産させない仕組みを先に置く", "必要資金1.5億円を4つの手段で段階的に調達し、現金残高が3年目の谷でも6,000万円を残す");
+    detailRef(s, DP.cash);
+    heading(s, "⑥ 資金計画・CF ─ 黒字倒産させない仕組みを先に置く", `必要資金1.8億円を段階的に調達し、現金残高が最も薄い${PR.findIndex((r) => r.cash === PLAN.minCash) + 1}年目でも約${man(Math.round(PLAN.minCash / 100) * 100)}万円を残す`);
     const lx = X0, lw = 4.3, top = 1.15;
-    txt(s, "調達の内訳（必要資金1.5億円）", { x: lx, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
+    txt(s, "調達の内訳（必要資金1.8億円）", { x: lx, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
     table(s, [
       ["時期", "手段", "金額", "目的"],
-      ["準備期", "出資（今回）", "500万円", "試作品・実証"],
+      ["準備期", "自己資金・創業補助金（予定）", "500万円", "試作品・実証"],
       ["1年目 期首", "日本政策金融公庫\n新規開業・スタートアップ支援資金", "1,000万円", "運転資金"],
       ["1年目 年央", "CVC・VC（電設・建設テック）", "1億1,500万円", "人員・開発"],
-      ["2年目〜", "公庫 資本性ローン（予備枠）", "2,000万円", "遅延時のみ"],
-      [{ text: "合計", bold: true }, "", { text: "1億5,000万円", bold: true }, ""],
-    ], { x: lx, y: top + 0.3, w: lw, colW: [0.8, 1.7, 0.95, 0.85], rowH: 0.36, size: 8, leftCols: [1, 3], strongRows: [5], name: "funding" });
+      ["3年目", "シリーズA（2年目の実績で交渉）", "5,000万円", "人員・販売"],
+      [{ text: "合計", bold: true }, "", { text: "1億8,000万円", bold: true }, ""],
+      ["予備", "公庫 資本性ローン", "2,000万円", "遅延時のみ"],
+    ], { x: lx, y: top + 0.3, w: lw, colW: [0.8, 1.7, 0.95, 0.85], rowH: 0.34, size: 8, leftCols: [1, 3], strongRows: [5], name: "funding" });
 
     const rx = 4.95, rw = 4.65;
     txt(s, "期末の現金残高（百万円）", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
@@ -837,7 +851,7 @@ async function main() {
     const lab = ["準備期", "1年目", "2年目", "3年目", "4年目", "5年目"];
     s.addChart([
       { type: pres.charts.LINE, data: [{ name: "現金残高", labels: lab, values: [0, ...PR.map((r) => mil(r.cash))] }], options: { chartColors: [K.ink], lineSize: 3, lineDataSymbol: "circle", lineDataSymbolSize: 6, showValue: true } },
-      { type: pres.charts.LINE, data: [{ name: "最低残高", labels: lab, values: [20, 20, 20, 20, 20, 20] }], options: { chartColors: [K.gray500], lineSize: 1.5, lineDash: "dash", lineDataSymbol: "none", showValue: false } },
+      { type: pres.charts.LINE, data: [{ name: "最低残高", labels: lab, values: Array(6).fill(Math.round(PR[3].sga / 4 / 100)) }], options: { chartColors: [K.gray500], lineSize: 1.5, lineDash: "dash", lineDataSymbol: "none", showValue: false } },
     ], { x: rx, y: top + 0.28, w: rw, h: 2.2, catAxisLabelColor: K.gray700, valAxisLabelColor: K.gray700, catAxisLabelFontSize: 8.5, valAxisLabelFontSize: 8,
       catAxisLabelFontFace: "+mn-lt", valAxisLabelFontFace: "+mn-lt", valGridLine: { color: K.rule, size: 0.5 }, catGridLine: { style: "none" },
       valAxisMinVal: 0, valAxisMaxVal: 175, valAxisMajorUnit: 25, valAxisLineShow: false, showLegend: false,
@@ -849,58 +863,28 @@ async function main() {
       run("① 利用料は年額前払い。導入支援は着手金50%", { breakLine: true }),
       run("② 現金残高が固定費3か月分を下回る前に、追加調達を始める", { breakLine: true }),
       run("③ 月次の資金繰り表で、入金と支払いの時期を12か月先まで管理", { breakLine: true }),
-      run("④ 計画が1年遅れても耐えられる備え（0.56億円）を残高に含める"),
+      run("④ シリーズAは2年目末の継続率・台数で交渉し、未達なら採用を絞る"),
     ], { x: rx + 0.15, y: top + 2.94, w: rw - 0.3, h: 0.78, size: 8.5, color: K.paper, psa: 1 });
-    txt(s, "簡易計算（税・償却・返済・運転資本を除く）。固定費3か月分＝3年目の販管費76百万円÷4。出資1.15億円が前提で、公庫だけなら1年目から現金不足", { x: X0, y: 4.98, w: W, h: 0.3, size: S.note, color: K.gray500 });
+    txt(s, `簡易計算（税・償却・返済・運転資本を除く）。固定費3か月分＝4年目の販管費${mil(PR[3].sga)}百万円÷4。出資が前提で、公庫だけなら1年目から現金不足`, { x: X0, y: 4.98, w: W, h: 0.3, size: S.note, color: K.gray500 });
   }
 
   // ---------- Slide ⑥黒字化の条件と撤退ライン ----------
   {
     const s = add(21);
-    heading(s, chap("⑥", "黒字化の条件 ─ 計画の6割取れれば黒字になる"), "届かなかった場合に備え、進む・直す・止まるの線を先に引いておく");
-    const top = 1.15, lw = 5.3;
-    txt(s, "新規拠点が計画に届かなかったら（百万円）", { x: X0, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
-    const yr = (r) => (r.firstBlack ? r.firstBlack + "年目" : "しない");
-    const rows = [1, 0.8, 0.7, 0.6, 0.5].map((k) => {
-      const a = shortfall(k, true), b = shortfall(k, false), hit = k === 0.6;
-      const c = (ok) => ({ color: ok ? K.ink : ACC, bold: hit || !ok });
-      return [{ text: k === 1 ? "計画どおり" : `計画の${k * 10}割`, bold: hit, color: hit ? ACC : K.ink }, { text: a.rows.map((r) => r.nw).join("・"), color: K.gray700 },
-        { text: yr(a), ...c(!!a.firstBlack) }, { text: String(mil(a.minCash)), ...c(a.minCash > 0) }, { text: yr(b), ...c(!!b.firstBlack) }, { text: String(mil(b.minCash)), ...c(b.minCash > 0) }];
-    });
-    table(s, [["新規の達成度", "新規拠点（1〜5年目）", "黒字化", "最低現金", "黒字化", "最低現金"], ...rows],
-      { x: X0, y: top + 0.55, w: lw, colW: [1.05, 1.45, 0.7, 0.7, 0.7, 0.7], rowH: 0.32, size: 8.5, align: "center", strongRows: [4], name: "shortfall" });
-    txt(s, "採用を実績に合わせる", { x: X0 + 2.5, y: top + 0.3, w: 1.4, h: 0.24, size: 8.5, bold: true, align: "center", valign: "middle", fill: K.fill });
-    txt(s, "採用は計画どおり", { x: X0 + 3.9, y: top + 0.3, w: 1.4, h: 0.24, size: 8.5, bold: true, color: ACC, align: "center", valign: "middle", fill: K.fill });
-    box(s, { x: X0, y: top + 2.62, w: lw, h: 0.9, fill: K.ink });
-    txt(s, [run("読み方", { bold: true, color: "E3A774", breakLine: true }),
-      run("採用を遅らせれば、計画の6割で黒字、5割を割ると黒字にならない。", { breakLine: true }),
-      run("遅れているのに計画どおり採用すると、7割でも現金が尽きる。", { breakLine: true }),
-      run("採用は「期末で社員1人3拠点」の見込みが立ってから")], { x: X0 + 0.15, y: top + 2.64, w: lw - 0.3, h: 0.86, size: 9, color: K.paper, valign: "middle", psa: 1 });
-
-    const rx = 6.0, rw = 3.6;
-    txt(s, "進む・直す・止まるの線", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
-    [["1年目末", "実証3社のうち本契約", [["2社以上", "進む", K.ink], ["1社", "値段と顧客を見直す", K.gray700], ["0社", "撤退か方向転換", ACC]]],
-     ["2年目末", "新規拠点", [["5以上", "計画どおり採用", K.ink], ["5未満", "採用を止める", ACC]]]].forEach(([when, what, opts], i) => {
-      const y = top + 0.32 + i * 1.62, h = opts.length * 0.38 + 0.36;
-      box(s, { x: rx, y, w: rw, h, line: K.ink, lw: 1 });
-      txt(s, [run(when + "　", { bold: true, color: ACC }), run(what, { bold: true })], { x: rx + 0.12, y: y + 0.04, w: rw - 0.24, h: 0.28, size: 9.5, valign: "middle" });
-      opts.forEach(([cond, act, c], j) => {
-        const yy = y + 0.36 + j * 0.38;
-        box(s, { x: rx + 0.12, y: yy, w: 0.85, h: 0.32, fill: c });
-        txt(s, cond, { x: rx + 0.12, y: yy, w: 0.85, h: 0.32, size: 9, bold: true, color: K.paper, align: "center", valign: "middle" });
-        txt(s, "→ " + act, { x: rx + 1.05, y: yy, w: rw - 1.15, h: 0.32, size: 9.5, valign: "middle" });
-      });
-    });
-    txt(s, "黒字化の年と最低現金は、新規拠点・受託を同じ割合で減らした簡易計算。採用連動は社員数＝4＋（計画−4）×達成度。調達は全シナリオで1億2,500万円", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
+    detailRef(s, DP.gates);
+    heading(s, chap("⑥", "黒字化の条件 ─ 鍵は拠点数より、1拠点の台数"), "10台のままでは計画の9割を割ると5年で黒字にならない。15台に増やせれば6割でも5年目に黒字");
+    L.gates(s, V);
+    txt(s, "新規拠点・受託を同じ割合で減らし、社員数＝4＋（計画−4）×達成度で採用も遅らせた簡易計算。15台はカメラ12台＋HMD3台", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
 
   // ---------- Slide 12 ⑦チーム・実行力 ----------
   {
     const s = add(22);
+    detailRef(s, DP.team);
     heading(s, chap("⑦", "チーム ─ 現場と技術を揃え、顧問とパートナーで補う"), "創業者の経歴・チームメンバーのスキル・外部パートナーと顧問");
     const lx = X0, lw = 3.4, top = 1.15;
     box(s, { x: lx, y: top, w: lw, h: 3.7, fill: K.ink, name: "founder" });
-    txt(s, [run("代表取締役 CEO", { fontSize: 9, breakLine: true }), run("志願者（創業者）", { bold: true, fontSize: 14 })], { x: lx + 0.15, y: top + 0.1, w: lw - 0.3, h: 0.6, color: K.paper });
+    txt(s, [run("代表取締役 CEO", { fontSize: 9, breakLine: true }), run("代表（創業者）", { bold: true, fontSize: 14 })], { x: lx + 0.15, y: top + 0.1, w: lw - 0.3, h: 0.6, color: K.paper });
     txt(s, [
       run("電線メーカー 電力事業部門で、66kV／275kV 地中送電線の施工管理5年", { breakLine: true }),
       run("Python・Power BI・FastAPI・Docker・LangChain・RAG を独学し業務に実装", { breakLine: true }),
@@ -911,25 +895,22 @@ async function main() {
     const rx = 3.95, rw = 5.65;
     txt(s, "チームと外部の体制", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
     table(s, [
-      ["役割", "求めるスキル", "時期", "状況"],
-      ["技術責任者（CTO）", "映像AI・クラウド開発", "1年目", "（記入）"],
-      ["現場監修", "電気工事の施工管理の経験", "1年目", "（記入）"],
-      ["カスタマーサクセス", "電気工事の現場経験・導入支援", "1年目", "（記入）"],
-      ["顧問", "電気工事業界・電力会社のOB", "準備期", "（記入）"],
-      ["専門家", "税理士・弁護士（データ契約）・弁理士", "準備期", "（記入）"],
-      ["パートナー", "スマートグラスメーカー・大学（映像AI）", "準備期〜", "（記入）"],
-    ], { x: rx, y: top + 0.3, w: rw, colW: [1.45, 2.4, 0.8, 1.0], rowH: 0.36, size: 8.5, leftCols: [1], name: "team" });
-    box(s, { x: rx, y: top + 3.0, w: rw, h: 0.7, fill: K.fill, name: "proof" });
-    txt(s, [run("実行力の証拠：", { bold: true }), run("音声の自動配信は毎朝稼働中。本日のデモアプリも自作。最初の3か月で試作品を出す")], { x: rx + 0.15, y: top + 3.0, w: rw - 0.3, h: 0.7, size: 9.5, valign: "middle" });
-    txt(s, "状況欄は確定・内諾・打診中・募集中のいずれかを記入する", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
+      ["役割", "人数 1→5年目", "主な仕事", "状況"],
+      ...V.ROLES.slice(1).map((r) => [r[0].replace(/（.*?）/, ""), `${r[2][0]}→${r[2][4]}人`, r[3], "（記入）"]),
+      ["社外顧問", "2人", "映像AI（大学）・電気工事業界のOB", "（記入）"],
+      ["パートナー", "─", "スマートグラスのメーカー・リース会社", "（記入）"],
+    ], { x: rx, y: top + 0.3, w: rw, colW: [1.45, 0.9, 2.45, 0.85], rowH: 0.27, size: 8, leftCols: [2], name: "team" });
+    box(s, { x: rx, y: top + 3.15, w: rw, h: 0.55, fill: K.fill, name: "proof" });
+    txt(s, [run("実行力の証拠：", { bold: true }), run("音声の自動配信は毎朝稼働中。本日のデモアプリも自作。最初の3か月で試作品を出す")], { x: rx + 0.15, y: top + 3.15, w: rw - 0.3, h: 0.55, size: 9.5, valign: "middle" });
+    txt(s, `状況欄は確定・内諾・打診中・募集中のいずれかを記入する。社員は5年目に${Y5.staff}人（役割別の年収は詳細版 p.17）`, { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
   // ---------- Slide 9 ライフサイクル ----------
   {
     const s = add(23);
     heading(s, "事業のライフサイクル ─ 成熟期には上場を目指す", "解決策の3段階を、導入期・成長期・成熟期に重ねる");
     const stg = [
-      ["導入期", "準備期〜2年目", "記録と報告を自動に", ["関東の電気工事会社3社で有償試験導入", "赤字。準備期は500万円で試作品と実証", "資金：出資・公庫融資・CVC"]],
-      ["成長期", "3〜5年目", "照合して品質を守る", ["30→85拠点。大手1社から協力会社へ", `4年目に黒字化、5年目 営業利益率${Math.round(PR[4].op / PR[4].sales * 100)}%`, "資金：自己資金＋予備の資本性ローン"]],
+      ["導入期", "準備期〜2年目", "記録と報告を自動に", ["関東の電気工事会社3社で有償試験導入", "赤字。準備期の6か月で試作品と実証", "資金：出資・公庫融資・CVC"]],
+      ["成長期", "3〜5年目", "照合して品質を守る", [`${PR[2].sites}→${Y5.sites}拠点。効果が出た班から台数を増やす`, `${fb}年目に黒字化。15台にできれば4年目`, "資金：シリーズA＋予備の資本性ローン"]],
       ["成熟期", "6年目〜", "作業をAIが学ぶ（フィジカルAI）", ["電線・素材の工場へ拡大、海外へ輸出", "蓄積した作業データでロボットに教える", "上場を目指す（資本市場から調達）"]],
     ];
     const top = 1.2, cw = 2.97, gap = 0.145, ch = 2.7;
@@ -947,12 +928,12 @@ async function main() {
     txt(s, "上場は目標であり、時期・市場は成長期の実績を見て判断する", { x: X0, y: 5.0, w: W, h: 0.24, size: S.note, color: K.gray500 });
   }
 
-  // ---------- Slide 11 希望金額の使い道・リターン ----------
+  // ---------- Slide 準備期の6か月 ----------
   {
     const s = add(24);
-    heading(s, "希望金額 500万円 ─ 6か月以内に最初の1拠点を動かす", "準備期の資金。創業者の給料はゼロで、すべて試作品と実証に使う");
+    heading(s, "準備期の6か月 ─ 最初の1拠点を動かす", "費用は約500万円。自己資金と補助金でまかない、創業者の給料はゼロ");
     const lx = X0, lw = 4.4, top = 1.15;
-    txt(s, "使い道（万円）", { x: lx, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
+    txt(s, "準備期の費用（万円）", { x: lx, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
     const uses = [["試作品の開発", 250, "クラウド・生成AI・外注エンジニア"], ["端末・機材", 80, "スマートグラス・ヘルメットカメラ 数台"], ["1拠点での実証", 100, "3か月の交通・設置・現場研修"], ["設立・契約・知財", 40, "法人設立、秘密保持・データ利用契約"], ["予備", 30, ""]];
     const k = (lw - 2.5) / 250;
     uses.forEach(([n, v, d], i) => {
@@ -972,13 +953,13 @@ async function main() {
       txt(s, v, { x: rx + 0.85, y, w: rw - 0.85, h: 0.46, size: 9.5, valign: "middle" });
     });
     box(s, { x: rx, y: top + 1.95, w: rw, h: 1.25, line: K.ink, lw: T.stroke.strong, name: "return" });
-    txt(s, "出資者へのリターン（提案）", { x: rx + 0.15, y: top + 2.0, w: rw - 0.3, h: 0.28, size: 10.5, bold: true });
+    txt(s, "準備期の後の調達", { x: rx + 0.15, y: top + 2.0, w: rw - 0.3, h: 0.28, size: 10.5, bold: true });
     txt(s, [
-      run("条件：", { bold: true }), run("500万円で発行済株式の10%（評価額 出資前4,500万円）", { breakLine: true }),
-      run("出口：", { bold: true }), run("成熟期の上場、または事業会社への売却", { breakLine: true }),
-      run("お願い：", { bold: true }), run("資金に加え、製造業・建設業の実証先のご紹介"),
+      run("1年目：", { bold: true }), run("実証の結果を持って、公庫1,000万円＋CVC・VC 1億1,500万円", { breakLine: true }),
+      run("3年目：", { bold: true }), run("継続率と台数の実績で、シリーズA 5,000万円", { breakLine: true }),
+      run("お願い：", { bold: true }), run("実証先になってくれる電気工事会社のご紹介"),
     ], { x: rx + 0.15, y: top + 2.3, w: rw - 0.3, h: 0.86, size: 9, psa: 3 });
-    txt(s, "出資条件は提案であり、交渉により決める", { x: X0, y: 5.0, w: W, h: 0.24, size: S.note, color: K.gray500 });
+    txt(s, "補助金の採否と自己資金の額は要確認。実証の合格ラインは1台1日26分の削減（詳細版 p.8）", { x: X0, y: 5.0, w: W, h: 0.24, size: S.note, color: K.gray500 });
   }
 
   // ---------- Slide 12 リスクと覚悟 ----------
@@ -1001,7 +982,7 @@ async function main() {
     hline(s, X0, 1.15 + 5 * 0.5, W, K.rule, T.stroke.rule);
     box(s, { x: X0, y: 3.88, w: W, h: 1.2, fill: K.ink, name: "closing" });
     txt(s, "日本の品質を支えてきた現場の勘を、人に依存しない形で残す", { x: X0 + 0.2, y: 3.98, w: W - 0.4, h: 0.4, size: 15, bold: true, color: K.paper });
-    txt(s, "その最初の一歩として、500万円で、6か月以内に最初の1拠点を動かします。", { x: X0 + 0.2, y: 4.45, w: W - 0.4, h: 0.5, size: 12, color: K.paper });
+    txt(s, "その最初の一歩として、6か月で最初の1拠点を動かします。", { x: X0 + 0.2, y: 4.45, w: W - 0.4, h: 0.5, size: 12, color: K.paper });
   }
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
