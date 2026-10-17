@@ -158,12 +158,14 @@ function charSVG(role, face = "normal") {
   if (face === "worried") { parts.push(brow(-22, -6), brow(22, 6)); }
   else if (face === "think") { parts.push(brow(-22, 4), brow(22, 4)); }
   else { parts.push(brow(-22, 3), brow(22, -3)); }
-  // glasses
+  // glasses: スポーツ型のAIグラス（顔に沿って巻き込む一枚レンズ。カメラは右上の角に小さく埋め込む）
   if (role === "junior") {
-    parts.push(`<rect x="60" y="94" width="36" height="26" rx="4" fill="${ink}" fill-opacity="0.15" stroke="${P.glass}" stroke-width="5"/>`);
-    parts.push(`<rect x="104" y="94" width="36" height="26" rx="4" fill="${ink}" fill-opacity="0.15" stroke="${P.glass}" stroke-width="5"/>`);
-    parts.push(`<path d="M96 104 L104 104 M60 102 L46 98 M140 102 L154 98" stroke="${P.glass}" stroke-width="5"/>`);
-    parts.push(`<circle cx="148" cy="96" r="5" fill="${P.glass}"/>`);
+    parts.push(`<path d="M48 94 Q100 82 152 94 L148 112 Q142 126 122 126 Q110 126 105 116 Q100 108 95 116 Q90 126 78 126 Q58 126 52 112 Z" fill="${P.glass}" fill-opacity="0.28" stroke="${ink}" stroke-width="4" stroke-linejoin="round"/>`);
+    parts.push(`<path d="M46 95 Q100 81 154 95" fill="none" stroke="${ink}" stroke-width="9" stroke-linecap="round"/>`); // 上のフレーム（眉の線）
+    parts.push(`<path d="M60 100 L74 98 M126 98 L140 100" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.8"/>`); // レンズの映り込み
+    parts.push(`<path d="M46 96 L38 100 M154 96 L162 100" stroke="${ink}" stroke-width="6" stroke-linecap="round"/>`); // つる
+    parts.push(`<circle cx="143" cy="92" r="5.5" fill="${ink}"/><circle cx="143" cy="92" r="2.2" fill="${P.glass}"/>`); // カメラ
+    parts.push(`<circle cx="57" cy="92" r="2.4" fill="#fff" stroke="${ink}" stroke-width="1.5"/>`); // 撮影中のランプ
   }
   if (role === "manager") {
     parts.push(`<circle cx="78" cy="${ey}" r="15" fill="none" stroke="${ink}" stroke-width="4"/><circle cx="122" cy="${ey}" r="15" fill="none" stroke="${ink}" stroke-width="4"/><path d="M93 ${ey} L107 ${ey}" stroke="${ink}" stroke-width="4"/>`);
@@ -194,7 +196,7 @@ function iconSVG(kind) {
     case "server": return s(`<rect x="40" y="24" width="120" height="44" rx="6" fill="#fff" stroke="${ink}" stroke-width="8"/><rect x="40" y="78" width="120" height="44" rx="6" fill="#fff" stroke="${ink}" stroke-width="8"/><rect x="40" y="132" width="120" height="44" rx="6" fill="#fff" stroke="${ink}" stroke-width="8"/><circle cx="64" cy="46" r="7" fill="${ink}"/><circle cx="64" cy="100" r="7" fill="${ink}"/><circle cx="64" cy="154" r="7" fill="${ink}"/><path d="M90 46 L140 46 M90 100 L140 100 M90 154 L140 154" stroke="${ink}" stroke-width="7"/>`);
     case "film": return s(`<rect x="20" y="40" width="160" height="120" rx="10" fill="#fff" stroke="${ink}" stroke-width="8"/><path d="M84 74 L84 126 L128 100 Z" fill="${ink}"/><path d="M20 62 L180 62 M20 138 L180 138" stroke="${ink}" stroke-width="5"/>`);
     case "report": return s(`<path d="M44 20 L130 20 L160 50 L160 180 L44 180 Z" fill="#fff" stroke="${ink}" stroke-width="8" stroke-linejoin="round"/><path d="M130 20 L130 50 L160 50" fill="none" stroke="${ink}" stroke-width="6"/><rect x="62" y="64" width="44" height="34" fill="${ink}"/><path d="M116 70 L142 70 M116 90 L142 90 M62 118 L142 118 M62 138 L142 138 M62 158 L120 158" stroke="${ink}" stroke-width="6"/>`);
-    case "glasses": return s(`<path d="M14 84 L186 84" stroke="${ink}" stroke-width="8"/><rect x="26" y="78" width="66" height="50" rx="10" fill="#1A1A1A" fill-opacity="0.12" stroke="${P.glass}" stroke-width="9"/><rect x="108" y="78" width="66" height="50" rx="10" fill="#1A1A1A" fill-opacity="0.12" stroke="${P.glass}" stroke-width="9"/><path d="M92 96 L108 96" stroke="${P.glass}" stroke-width="9"/><circle cx="170" cy="64" r="10" fill="${ink}"/><circle cx="170" cy="64" r="4" fill="#fff"/>`);
+    case "glasses": return s(`<path d="M10 92 L2 104 M190 92 L198 104" stroke="${ink}" stroke-width="9" stroke-linecap="round"/><path d="M14 86 Q100 62 186 86 L180 116 Q172 142 138 142 Q116 142 108 124 Q100 110 92 124 Q84 142 62 142 Q28 142 20 116 Z" fill="${P.glass}" fill-opacity="0.3" stroke="${ink}" stroke-width="7" stroke-linejoin="round"/><path d="M10 88 Q100 60 190 88" fill="none" stroke="${ink}" stroke-width="14" stroke-linecap="round"/><path d="M38 100 L66 94 M134 94 L162 100" stroke="#fff" stroke-width="6" stroke-linecap="round" opacity="0.85"/><circle cx="168" cy="80" r="11" fill="${ink}"/><circle cx="168" cy="80" r="4.5" fill="${P.glass}"/><circle cx="32" cy="80" r="4.5" fill="#fff" stroke="${ink}" stroke-width="2.5"/>`); // スポーツ型のAIグラス（右上にカメラ、左上に撮影中のランプ）
     case "clock": return s(`<circle cx="100" cy="100" r="76" fill="#fff" stroke="${ink}" stroke-width="8"/><path d="M100 50 L100 100 L136 120" stroke="${ink}" stroke-width="9" fill="none" stroke-linecap="round"/>`);
     case "book": return s(`<path d="M100 50 Q60 30 20 44 L20 164 Q60 150 100 170 Q140 150 180 164 L180 44 Q140 30 100 50 Z" fill="#fff" stroke="${ink}" stroke-width="8" stroke-linejoin="round"/><path d="M100 50 L100 170" stroke="${ink}" stroke-width="6"/><path d="M40 74 L80 80 M40 98 L80 104 M120 80 L160 74 M120 104 L160 98" stroke="${ink}" stroke-width="5"/>`);
     case "bait": return s(`<path d="M100 20 L100 120 Q100 160 70 160 Q44 160 44 134" stroke="${ink}" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M44 134 L36 150 M44 134 L58 144" stroke="${ink}" stroke-width="8" stroke-linecap="round"/><circle cx="100" cy="30" r="12" fill="${hi}"/>`);
