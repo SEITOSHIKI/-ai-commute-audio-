@@ -105,7 +105,6 @@ async function main() {
     t(s, "AIグラス × 電気工事。メガネを掛けて働くだけで、書類と教材ができる", { x: 0.6, y: 3.4, w: 8.8, h: 0.5, size: 18, color: PAPER, bold: false, light: true });
     rect(s, 0.6, 4.2, 4.6, 0.6, ACC);
     t(s, "株式会社カンツギ　事業計画（10分）", { x: 0.75, y: 4.2, w: 4.4, h: 0.6, size: 16, color: PAPER });
-    t(s, "発表者：＿＿＿＿＿＿", { x: 5.5, y: 4.2, w: 3.9, h: 0.6, size: 16, color: PAPER, bold: false, light: true });
   }
 
   // 2 一言で

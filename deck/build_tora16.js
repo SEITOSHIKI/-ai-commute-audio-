@@ -1,5 +1,5 @@
-// カンツギ 事業計画書「16枚版」: 本編（33枚）の中身を、A4表裏（8枚×2面）の配布と10分の発表に収めたもの。
-// デザインは本編と同じ。2〜3枚分を1枚に統合し、深さ（式・表・前提）は残す。数字はすべて tora_v2.js から。
+// カンツギ 事業計画書「16枚版」: 本編（33枚）の中身を、A4用紙2枚（表裏4ページ・1ページ4枚）の配布と10分の発表に収めたもの。
+// 本編の2〜3枚分を1枚に統合し、深さ（式・表・前提）は残す。見た目は tora16_theme.js（図面の枠・紺の見出し・安全色）。数字はすべて tora_v2.js から。
 // Usage: node build_tora16.js [outDir]   (needs pptxgenjs and sharp)
 const path = require("path");
 const fs = require("fs");
@@ -8,7 +8,8 @@ const L = require("./tora_lib.js");
 const V = require("./tora_v2.js");
 const { estimate } = require("./tora_market.js");
 
-const { K, X0, W, ACC, txt, box, hline, arrow, run, heading, table } = L;
+const TH = require("./tora16_theme.js");
+const { K, X0, W, ACC, txt, box, hline, arrow, run, heading, table, NAVY, YELLOW, PALEY, GREEN, RED, GRAY7 } = TH;
 const OUT_DIR = process.argv[2] || __dirname;
 const OUT = path.join(OUT_DIR, "カンツギ_事業計画書_16枚版.pptx");
 const ASSETS = path.join(__dirname, "assets");
@@ -27,14 +28,14 @@ const gapSites = Math.ceil((Y5.sga - Y5.gp) / U.gpYear);
 const siteYears = R10.rows.reduce((a, r) => a + r.sites, 0);
 const IMPACT = { hours: siteYears * CV.freedHours, value: siteYears * CV.docs };
 const hr = (v) => man(Math.round(v * 100) * 100);
-const DARK = "E3A774";
+const DARK = YELLOW; // 紺の箱の上のラベル
 const note = (s, text) => txt(s, text, { x: X0, y: 4.98, w: W, h: 0.24, size: 7.5, color: K.gray500 });
 const darkBox = (s, x, y, w, h, parts, size = 9.5) => { box(s, { x, y, w, h, fill: K.ink }); txt(s, parts, { x: x + 0.14, y, w: w - 0.28, h, size, color: K.paper, valign: "middle", psa: 2 }); };
 const lab = (t, dark) => run(t, { bold: true, color: dark ? DARK : ACC });
 
-// ---------- 台本（清 俊紀の言葉：結論を先に、数字で、自分の経験とつなげる。1分約300字） ----------
+// ---------- 台本（結論を先に、数字で、自分の経験とつなげる。1分約300字） ----------
 const NOTE_LIST = [null,
-  ["表紙と構成", `株式会社カンツギの清俊紀です。カンツギは「勘を継ぐ」と書きます。割れた器を金で継ぐ金継ぎのように、途切れそうな現場の勘をデータで継ぐ、という意味を込めました。今日は課題の5つの設問の順に、10分でお話しします。前提は、来年、十分な自己資金で事業を立ち上げることです。最初の目標は、6か月で1拠点を立ち上げることです。`],
+  ["表紙と構成", `株式会社カンツギです。カンツギは「勘を継ぐ」と書きます。割れた器を金で継ぐ金継ぎのように、途切れそうな現場の勘をデータで継ぐ、という意味を込めました。今日は課題の5つの設問の順に、10分でお話しします。前提は、来年、十分な自己資金で事業を立ち上げることです。最初の目標は、6か月で1拠点を立ち上げることです。`],
   ["事業概要と、選んだ理由", `結論から言うと、職長がAIグラスを掛けて作業するだけで、写真台帳と日報ができ、図面と照合し、若手の教材にもなるサービスです。お客様は関東の中堅の電気工事会社で、1拠点10台で年300万円です。この事業を選んだ理由は3つあります。1つ目は、人手不足と残業規制で、人を増やしても解決できないこと。2つ目は、映像を理解するAIと軽いAIグラスが実用レベルになったこと。3つ目は、私自身が地中送電線の現場で、ベテランの判断が手順書に残らないまま退職で消えるのを見てきたことです。`],
   ["背景と課題", `困っているのは三者です。推進するDX担当、使う施工管理者と電工、費用を出す工事部長です。数字で言うと、建設業で働く人の36.7%が55歳以上で、29歳以下は11.7%しかいません。2024年からは、残業も原則月45時間までになりました。熟練者が辞めると、若手が寸法や順番を間違えて、手戻りが増えます。手戻りは建設全体で年約1.5兆円、電気工事だけで約2,400億円と見積もっています。`],
   ["解決策とデモ", `解決策はデモで説明します。若手の作業を記録して、半導電層が図面より8mm短いことを見つけます。遠隔のベテランが「テープ基準で測り直す」と指示し、その判断も記録します。写真は手順ごとに報告書へ入るので、作業者が報告書に使う時間はゼロです。他社がすぐに真似できない理由は3つです。記録は使うほど貯まること。映像のどこが大事かは、施工経験者にしか判断できないこと。電気工事の型を先に揃えることです。`],
@@ -66,32 +67,40 @@ const NOTES = {};
 
 async function main() {
   const pres = new pptxgen();
-  const add = await L.setup(pres, "株式会社カンツギ 事業計画書（16枚版）", NOTES);
+  const add = await TH.setup(pres, "株式会社カンツギ 事業計画書（16枚版）", NOTES);
   const yrs = ["1年目", "2年目", "3年目", "4年目", "5年目"];
 
   // ---------- 1 表紙・構成 ----------
   {
     const s = add(1);
-    box(s, { x: 0, y: 0, w: 3.4, h: 5.625, fill: K.ink });
-    s.addImage({ data: await L.png("kantsugi-logotype-reverse"), x: 0.35, y: 0.7, w: 2.7, h: 2.7 * 120 / 560 });
-    txt(s, "現場の勘を、\n次の担い手へ。", { x: 0.35, y: 1.55, w: 2.9, h: 0.95, size: 20, bold: true, color: K.paper, lsm: 1.2 });
-    txt(s, "株式会社カンツギ", { x: 0.35, y: 2.7, w: 2.9, h: 0.3, size: 11, color: K.paper });
-    txt(s, "勘継＝金継ぎのように現場の勘を継ぐ", { x: 0.35, y: 3.0, w: 2.9, h: 0.28, size: 9.5, color: K.paper });
-    txt(s, "発表者：清 俊紀", { x: 0.35, y: 4.6, w: 2.9, h: 0.3, size: 10, color: K.paper });
-    const rx = 3.75, rw = 5.85;
-    txt(s, "事業計画書（10分・16枚）", { x: rx, y: 0.35, w: rw, h: 0.26, size: 11, color: K.gray700 });
-    txt(s, "人が減っても、現場が迷わず回る仕組みをつくる", { x: rx, y: 0.62, w: rw, h: 0.42, size: 16, bold: true });
-    txt(s, "AIグラスで熟練者の作業を記録し、書類づくりと若手の育成を自動化する", { x: rx, y: 1.05, w: rw, h: 0.45, size: 10.5 });
+    s.addImage({ data: await L.png("kantsugi-logotype-color"), x: 0.45, y: 0.38, w: 1.9, h: 1.9 * 120 / 560 });
+    txt(s, "事業計画書（10分・16枚）", { x: 0.45, y: 0.9, w: 5.6, h: 0.26, size: 10.5, color: GRAY7 });
+    txt(s, "現場の勘を、次の担い手へ。", { x: 0.45, y: 1.16, w: 5.6, h: 0.6, size: 26, bold: true, color: NAVY, valign: "middle" });
+    txt(s, "人が減っても、現場が迷わず回る仕組みをつくる。AIグラスで熟練者の作業を記録し、書類づくりと若手の育成を自動化する", { x: 0.45, y: 1.8, w: 5.6, h: 0.5, size: 10.5 });
+    hline(s, 0.45, 2.42, 9.1, NAVY, 1.25);
     table(s, [["設問", "一言の答え", "頁"],
       [{ text: "① 事業・理由・想い", bold: true }, "AIグラスで作業を記録し、書類と育成を自動化する。現場で勘が消えるのを止めたい", "2〜6"],
       [{ text: "② スタッフ", bold: true }, `5年目${Y5.staff}人。現場監修と導入コンサルタントを社内に置く`, "7"],
       [{ text: "③ 経営理念", bold: true }, "現場の勘を、次の担い手へ。記録は監視ではなく、技術を残すため", "8"],
       [{ text: "④ 経営計画", bold: true }, `1拠点年300万円。5年間は赤字、10年なら${R10.firstBlack}年目に黒字。15台なら5年目`, "9〜14"],
       [{ text: "⑤ 段階ごとの課題", bold: true }, "効果 → 販売と定着 → 台数と採用 → 大手との競合", "15〜16"]],
-      { x: rx, y: 1.62, w: rw, colW: [1.6, 3.75, 0.5], rowH: 0.36, size: 9.5, leftCols: [1], align: "center", name: "toc" });
-    box(s, { x: rx, y: 3.95, w: rw, h: 0.9, line: ACC, lw: 1.5 });
-    txt(s, [lab("課題の前提："), run("来年、豊富な資金をもとに新しい事業を立ち上げて経営する。資金は自己資金（融資・出資は使わない）。", { breakLine: true }),
-      lab("最初の目標："), run(`6か月で1拠点を立ち上げる。合格ラインは1台1日${be}分の削減`)], { x: rx + 0.14, y: 3.95, w: rw - 0.28, h: 0.9, size: 9.5, valign: "middle", psa: 3 });
+      { x: 0.45, y: 2.58, w: 5.6, colW: [1.55, 3.55, 0.5], rowH: 0.36, size: 9, leftCols: [1], align: "center", name: "toc" });
+    // 地中送電ケーブル（CV）の断面：外側から シース・遮へい層・外部半導電層・絶縁体・内部半導電層・導体
+    const cx = 7.15, cy = 3.25, layers = [[0.66, "3A3F44"], [0.56, "8C6239"], [0.5, "2B2B2B"], [0.46, "F2F4F6"], [0.24, "2B2B2B"], [0.2, "B87333"]];
+    layers.forEach(([r, c]) => s.addShape("ellipse", { x: cx - r, y: cy - r, w: 2 * r, h: 2 * r, fill: { color: c }, line: { color: "2B2B2B", width: 0.5 } }));
+    [["シース", -0.42, -0.5], ["遮へい層", -0.53, -0.16], ["絶縁体", 0.3, 0.12], ["導体", 0.08, 0.38]].forEach(([n, dx, dy], i) => {
+      const ly = 2.7 + i * 0.36, ex = cx + dx, ey = cy + dy;
+      s.addShape("line", { x: Math.min(ex, 8.05), y: Math.min(ey, ly + 0.11), w: Math.abs(8.05 - ex), h: Math.abs(ly + 0.11 - ey), flipV: ly + 0.11 < ey && ex < 8.05 ? true : false, line: { color: GRAY7, width: 0.5 } });
+      txt(s, n, { x: 8.1, y: ly, w: 1.4, h: 0.22, size: 8.5, color: GRAY7, valign: "middle" });
+    });
+    txt(s, "地中送電ケーブル（CV）の断面", { x: 6.35, y: 4.0, w: 3.2, h: 0.22, size: 8, color: GRAY7, align: "center" });
+    box(s, { x: 6.35, y: 4.3, w: 3.2, h: 0.78, fill: TH.PALE });
+    txt(s, [run("課題の前提：", { bold: true, color: NAVY }), run("豊富な自己資金で事業を立ち上げる（融資・出資は使わない）", { breakLine: true }),
+      run("最初の目標：", { bold: true, color: NAVY }), run(`6か月で1拠点。合格ラインは1台1日${be}分の削減`)], { x: 6.45, y: 4.3, w: 3.0, h: 0.78, size: 8.5, valign: "middle", psa: 2 });
+    box(s, { x: 6.6, y: 5.2, w: 3.28, h: 0.305, line: NAVY });
+    txt(s, [run("件名 ", { color: GRAY7 }), run("株式会社カンツギ 事業計画書", { bold: true, color: NAVY })], { x: 6.68, y: 5.2, w: 2.6, h: 0.305, size: 8, valign: "middle" });
+    txt(s, "1／16", { x: 9.3, y: 5.2, w: 0.58, h: 0.305, size: 9, bold: true, color: NAVY, align: "center", valign: "middle" });
+    s.addShape("line", { x: 9.3, y: 5.2, w: 0, h: 0.305, line: { color: NAVY, width: 0.75 } });
   }
 
   // ---------- 2 ①事業概要・選んだ理由と想い ----------
@@ -296,7 +305,7 @@ async function main() {
     const top = 1.12, lw = 4.6;
     txt(s, "ターゲット市場の数え方（顧客数×年額、億円）", { x: X0, y: top, w: lw, h: 0.26, size: 11, bold: true });
     table(s, [["業種＼規模", "大（300人以上）", "中（30〜299人）"],
-      ["電気工事", "300社×1,500万＝45", { text: "2,100社×300万＝63", bold: true, fill: "F6E7DA" }],
+      ["電気工事", "300社×1,500万＝45", { text: "2,100社×300万＝63", bold: true, fill: PALEY }],
       ["電気通信工事", "100社×1,500万＝15", "600社×300万＝18"],
       [{ text: "合計（中堅以上 約3,100社）", bold: true }, "", { text: "約141億円", bold: true, color: ACC }]],
       { x: X0, y: top + 0.3, w: lw, colW: [1.6, 1.5, 1.5], rowH: 0.32, size: 9, align: "center", name: "seg" });
@@ -385,7 +394,7 @@ async function main() {
       ["売上（百万円）", "─", ...R.map((r) => String(mil(r.sales)))],
       ["粗利率", "─", ...R.map((r) => Math.round(r.gpRate * 100) + "%")],
       ["販管費（百万円）", "─", ...R.map((r) => String(mil(r.sga)))],
-      [{ text: "営業損益（百万円）", bold: true }, "▲5", ...R.map((r) => ({ text: (r.op < 0 ? "▲" : "") + Math.abs(mil(r.op)), color: r.op < 0 ? ACC : K.ink, bold: true }))],
+      [{ text: "営業損益（百万円）", bold: true }, "▲5", ...R.map((r) => ({ text: (r.op < 0 ? "▲" : "") + Math.abs(mil(r.op)), color: r.op < 0 ? RED : K.ink, bold: true }))],
       ["期末の現金（百万円）", "─", ...R.map((r) => String(mil(r.cash)))],
       ["進む条件", `1台1日${be}分以上`, "2社以上が本契約", "平均12台", "継続率90%", "─", "─"]],
       { x: X0, y: top, w: W, colW: [1.55, 1.2, 1.29, 1.29, 1.29, 1.29, 1.29], rowH: [0.26, 0.52, 0.26, 0.26, 0.26, 0.26, 0.26, 0.26, 0.26, 0.32], size: 8.5, align: "center", leftCols: [0], strongRows: [7], name: "yearly" });
@@ -409,15 +418,15 @@ async function main() {
     const sc = (k, plan) => V.run({ plan, newSites: V.GROWTH.newSites.map((n) => Math.round(n * k)), contract: V.GROWTH.contract.map((c) => c * k), hireK: k < 1 ? k : undefined });
     const yr = (r) => (r.firstBlack ? r.firstBlack + "年目" : "5年でしない");
     txt(s, "新規が計画に届かなかったら（採用も連動）", { x: X0, y: top + 2.32, w: lw, h: 0.26, size: 11, bold: true });
-    table(s, [["新規の達成度", "10台のまま", "15台に増やせたら"], ...[1, 0.8, 0.6].map((k) => { const a = sc(k), b = sc(k, D15plan); return [k === 1 ? "計画どおり" : `計画の${k * 10}割`, { text: yr(a), color: a.firstBlack ? K.ink : ACC, bold: !a.firstBlack }, { text: yr(b), bold: true }]; })],
+    table(s, [["新規の達成度", "10台のまま", "15台に増やせたら"], ...[1, 0.8, 0.6].map((k) => { const a = sc(k), b = sc(k, D15plan); return [k === 1 ? "計画どおり" : `計画の${k * 10}割`, { text: yr(a), color: a.firstBlack ? K.ink : RED, bold: !a.firstBlack }, { text: yr(b), bold: true }]; })],
       { x: X0, y: top + 2.62, w: lw, colW: [1.45, 1.4, 1.6], rowH: 0.27, size: 9, align: "center", name: "short" });
     const rx = 5.1, rw = 4.5;
     txt(s, "進む・直す・止まるの判断基準", { x: rx, y: top, w: rw, h: 0.26, size: 11, bold: true });
     table(s, [["時期", "進む", "直す・止まる"],
-      ["実証（準備期）", `1台1日${be}分以上`, `15〜${be}分：写真台帳に絞る／15分未満：撤退`],
-      ["1年目末", "試験導入3社のうち2社以上が本契約", "1社：値段と顧客を見直す／0社：撤退か方向転換"],
-      ["2年目末", "5拠点以上・平均12台", "未達：採用を止める"],
-      ["3年目", "継続率90%以上", "未達：追加資金と採用を絞る"]],
+      ["実証（準備期）", { text: `1台1日${be}分以上`, color: GREEN, bold: true }, { text: `15〜${be}分：写真台帳に絞る／15分未満：撤退`, color: RED }],
+      ["1年目末", { text: "試験導入3社のうち2社以上が本契約", color: GREEN, bold: true }, { text: "1社：値段と顧客を見直す／0社：撤退か方向転換", color: RED }],
+      ["2年目末", { text: "5拠点以上・平均12台", color: GREEN, bold: true }, { text: "未達：採用を止める", color: RED }],
+      ["3年目", { text: "継続率90%以上", color: GREEN, bold: true }, { text: "未達：追加資金と採用を絞る", color: RED }]],
       { x: rx, y: top + 0.3, w: rw, colW: [1.05, 1.5, 1.95], rowH: [0.26, 0.5, 0.5, 0.36, 0.36], size: 8.5, leftCols: [1, 2], name: "gates" });
     darkBox(s, rx, 3.5, rw, 1.37, [lab("黒字化の条件は、拠点数より1拠点の台数", true), run("", { breakLine: true }),
       run(`10台のままでは計画どおりでも5年で黒字にならない（5年目▲${mil(-Y5.op)}百万円）。効果が出た班から15台に増やせれば5年目に黒字（${mil(D15.y5.op)}百万円）、新規が計画の6割でも黒字`, { breakLine: true }),
@@ -444,7 +453,7 @@ async function main() {
     const rx = 5.95, rw = 3.65;
     txt(s, "前提が崩れても10年で黒字になるか", { x: rx, y: top, w: rw, h: 0.26, size: 11, bold: true });
     const TEN = [["計画どおり（10台）", {}], ["1拠点15台", { plan: D15plan }], ["解約 年20%", { churnRate: 0.2 }], ["値下げ −20%", { priceK: 0.8 }], ["AI・保存費が2倍", { perDevice: V.cloudPerDevice * 2 }]]
-      .map(([n, o]) => { const r = V.run({ years: 10, ...o }); return [n, r.firstBlack ? r.firstBlack + "年目" : "─", { text: r.cumBack ? r.cumBack + "年目" : "─", color: r.cumBack ? K.ink : ACC, bold: !r.cumBack }, { text: String(mil(r.minCash)), color: r.minCash < 0 ? ACC : K.ink, bold: r.minCash < 0 }]; });
+      .map(([n, o]) => { const r = V.run({ years: 10, ...o }); return [n, r.firstBlack ? r.firstBlack + "年目" : "─", { text: r.cumBack ? r.cumBack + "年目" : "─", color: r.cumBack ? K.ink : RED, bold: !r.cumBack }, { text: String(mil(r.minCash)), color: r.minCash < 0 ? RED : K.ink, bold: r.minCash < 0 }]; });
     table(s, [["10年で", "黒字", "赤字を回収", "最低現金"], ...TEN], { x: rx, y: top + 0.3, w: rw, colW: [1.35, 0.7, 0.85, 0.75], rowH: 0.28, size: 8.5, align: "center", leftCols: [0], strongRows: [1], name: "stress10" });
     darkBox(s, rx, top + 2.12, rw, 1.66, [lab("ポイント", true), run("", { breakLine: true }),
       run(`利用料は毎年積み上がるため、6年目以降は利益が伸びる。10年目の営業利益は約${mil(R10.rows[9].op)}百万円（15台なら約${mil(R10_15.rows[9].op)}百万円）`, { breakLine: true }),

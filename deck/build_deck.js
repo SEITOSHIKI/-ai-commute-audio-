@@ -151,7 +151,7 @@ async function main() {
     hline(s, rx, y0 + 3 * rh, rw, K.rule, T.stroke.rule);
     box(s, { x: rx, y: 3.78, w: rw, h: 0.72, fill: K.fill, name: "policy-quote" });
     txt(s, [run("「暗黙知が豊富な現場へのバーティカルAIの開発・実装を推進し、輸出も促進する」", { bold: true, breakLine: true }), run("─ 内閣府「人工知能基本計画 ～日本AX、より強く、より豊かに～」（令和8年7月14日 閣議決定）", { fontSize: 8, color: K.gray700 })], { x: rx + 0.12, y: 3.78, w: rw - 0.24, h: 0.72, size: 9.5, valign: "middle", psa: 2 });
-    txt(s, "発表者：＿＿＿＿＿＿＿＿＿＿　　発表時間：10分", { x: rx, y: 4.65, w: rw, h: 0.3, size: 10.5, color: K.gray700 });
+    txt(s, "発表時間：10分", { x: rx, y: 4.65, w: rw, h: 0.3, size: 10.5, color: K.gray700 });
   }
 
   // ---------- Slide 2 課題（設問①：選んだ理由） ----------

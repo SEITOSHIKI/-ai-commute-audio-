@@ -217,7 +217,6 @@ async function main() {
     txt(s, "最初の一歩", { x: rx + 0.2, y: 2.68, w: 2, h: 0.3, size: 12, bold: true, color: K.gray700 });
     txt(s, "6か月で1拠点を動かす", { x: rx + 0.2, y: 2.98, w: rw - 0.4, h: 0.55, size: 26, bold: true, color: ACC, valign: "middle" });
     txt(s, `3か月で試作品、3か月で実証。合格ラインは「1台1日${be}分の削減」`, { x: rx + 0.2, y: 3.52, w: rw - 0.4, h: 0.3, size: 10, color: K.gray700, valign: "middle" });
-    txt(s, "発表者：＿＿＿＿＿＿＿＿＿＿", { x: rx, y: 4.25, w: rw, h: 0.3, size: 10.5, color: K.gray700 });
   }
 
   // ---------- Slide 設問との対応 ----------
