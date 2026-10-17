@@ -1,9 +1,10 @@
 // カンツギ 事業計画書「やさしい版（マンガ）」: story and the money mechanics in comic panels.
+// 見た目は16枚版と同じ（tora_lib の drawing()：図面の枠・紺・安全色。ヘルメットは黄、緑十字）。数字は tora_v2.js から。
 // Usage: node build_tora_easy.js [outDir]   (needs pptxgenjs and sharp)
 const path = require("path");
 const fs = require("fs");
 const pptxgen = require("pptxgenjs");
-const L = require("./tora_lib.js");
+const L = require("./tora_lib.js").drawing();
 const { run: model, unit, shortfall } = require("./tora_model.js");
 const V = require("./tora_v2.js");
 
@@ -18,6 +19,7 @@ const HAVG = (15 * V.H.electrician + 20 * V.H.manager) / 35; // 1時間の人件
 const M = (v) => Math.round(v / 100); // 万円 → 百万円
 const be = Math.round(CV.breakEvenMin);
 const F15 = V.run({ plan: { devices: 15, mix: { glass: 12, display: 3 } } }).firstBlack;
+const R10 = V.run({ years: 10 }); // 10年で見ると：6年目に黒字、8年目に5年間の赤字を回収
 
 // ---------- notes: what to say, in spoken words ----------
 const NOTE_PARTS = {
@@ -38,31 +40,39 @@ const NOTE_PARTS = {
   8: ["お金の話2・40秒", `1台1日35分減ると年${man(CV.docs)}万円。${be}分減れば元が取れる`,
     `なぜ工事部長は払うのか。メガネを掛けた班では、職長の日報と撮影が1日15分、施工管理者の写真整理と写真台帳が20分減ると考えています。10台を年240日使うと、浮く時間の価値は年約${man(CV.docs)}万円。1時間の人件費は、国の統計の年収に会社が払う社会保険料を足し、残業を含む年${man(V.WAGE.annualHours)}時間で割った約${man(Math.round(HAVG * 1000) * 10)}円です。お客様が払うのは利用料とリースで年約${man(CV.cost)}万円なので、約${CV.ratio.toFixed(1)}倍。逆に言えば、1台1日${be}分減れば元が取れます。これを実証の合格ラインにします。`],
   9: ["お金の話2つづき・40秒", "計画に入れるのは確かな分だけ。手戻りは測れたら上乗せ",
-    "工事部長が得するのは、書類の時間だけではありません。やり直しが減れば、ARが効く工種だけでも年約360万円。ただ、これはAIの出来と私たちの監修次第なので、実証で測れるまで計画には入れません。新人の指導は、他の仕事と混ざっていて測れないので、金額にせず、独り立ちまでの月数で測ります。確かな分だけで約" + CV.ratio.toFixed(1) + "倍、手戻りも減れば約" + CV.ratioUp.toFixed(1) + "倍です。"],
+    "工事部長にとっての効果は、書類の時間だけではありません。やり直しが減れば、ARが効く工種だけでも年約360万円。ただ、これはAIの出来と私たちの監修次第なので、実証で測れるまで計画には入れません。新人の指導は、他の仕事と混ざっていて測れないので、金額にせず、独り立ちまでの月数で測ります。確かな分だけで約" + CV.ratio.toFixed(1) + "倍、手戻りも減れば約" + CV.ratioUp.toFixed(1) + "倍です。"],
   10: ["お金の話3・40秒", "利用料300万円のうち216万円が残る。だから利用料を積み上げる",
     "次に、当社の財布に何が残るか。300万円の利用料のうち、AIの文字起こしや画像の解析、動画の保存の費用が、メガネ1台あたり月約6,000円、会社ごとのデータ置き場が月1万円で、10台なら年84万円。216万円が残ります。導入支援の200万円は、担当者が42人日現場に入り、交通費もかかるので、残るのは約59万円。だから当社は、人が動く仕事ではなく、利用料を積み上げる会社にします。"],
   11: ["お金の話4・40秒", "社員1人で約4拠点を見れば黒字。10台のままでは5年目でも届かない",
     `なぜ赤字が続くのか。社員1人にかかる費用は、給料と会社負担、採用費、家賃などを合わせて年約${man(PER)}万円。1拠点から残るのは${man(U.gpYear)}万円。割ると約${(PER / U.gpYear).toFixed(1)}。新しいお客様は最初の年は半年分しか払わないので、年度末に数えると1人約4拠点が目安です。社員は、営業だけでなく技術や導入コンサルタントも含めた全員です。人を先に雇うので、10台のままでは5年目でも${Y5.sitesPerStaff.toFixed(2)}で届きません。だから、効果が出た班からメガネを増やしてもらいます。`],
   12: ["お金の話5・40秒", "去年のお客様が今年も払う。売上は雪だるま式",
-    `利用料は毎年いただくので、去年までのお客様の分が今年の売上に乗ります。解約は毎年1割と控えめに見ています。5年目の売上約${man(Y5.sales / 100)}百万円のうち、${Math.round(Y5.existing / Y5.sales * 100)}%は前の年までのお客様からの利用料です。新しいお客様が増えるたびに、雪だるまのように大きくなります。10台のままでは5年目もまだ赤字で、1拠点15台に増やせれば${F15}年目に黒字です。`],
+    `利用料は毎年いただくので、去年までのお客様の分が今年の売上に乗ります。解約は毎年1割と控えめに見ています。5年目の売上約${man(Y5.sales / 100)}百万円のうち、${Math.round(Y5.existing / Y5.sales * 100)}%は前の年までのお客様からの利用料です。新しいお客様が増えるたびに、雪だるまのように大きくなります。10台のままでは5年目もまだ赤字で、1拠点15台に増やせれば${F15}年目に黒字です。10年で見ると、10台のままでも${R10.firstBlack}年目に黒字になり、${R10.cumBack}年目に5年間の赤字を取り戻します。`],
   13: ["お金の話6・30秒", `${man(U.cac)}万円かけて連れてきたお客様が、${man(U.ltv(7))}万円残してくれる`,
     `お客様1拠点を連れてくる費用は約${man(U.cac)}万円。営業3人の人件費と広告費を、新しいお客様の数で割った数字です。一方、1拠点が7年間で残してくれる粗利は約${man(U.ltv(7))}万円。約${Math.round(U.ltv(7) / U.cac)}倍です。${man(U.cac)}万円は約${Math.round(U.paybackMonths)}か月で回収できます。解約が年1割なら平均10年続くので、7年は控えめに見た数字です。`],
-  14: ["お金の話7・40秒", "黒字の鍵は、1拠点の台数。止まる線も先に決める",
+  14: ["お金の話7・40秒", "黒字化の条件は、1拠点の台数。止まる線も先に決める",
     `うまくいかなかったらどうするか。計算すると、1拠点10台のままだと、計画どおりにお客様が増えても5年以内に黒字になりません。でも、効果が出た班から台数を増やして15台にできれば、新しいお客様が計画の6割でも5年目に黒字です。だから大事なのは、拠点の数より、1拠点で使ってもらう台数です。そして止まる線を先に決めます。実証で1台1日${be}分減れば進む、15分未満なら撤退。1年目の終わりに、試してくれた3社のうち本契約が0社なら撤退か方向転換。2年目の終わりに平均12台に届かなければ、採用を止めます。`],
   15: ["準備期・30秒", "準備期の6か月で、最初の1拠点を動かす",
     `最初の6か月は準備期です。費用は約500万円で、自己資金でまかないます。私の給料はゼロです。3か月で試作品、6か月で1拠点の実証。1台1日${be}分減ったか、メガネで1日記録できるかを確かめます。合格したら、自己資金の2億円を入れて、仲間を採用します。`],
   16: ["全体図・30秒", "上の矢印は記録とサービス、下の矢印はお金",
-    "1枚にまとめるとこうなります。上の流れが記録とサービス。お客様の現場から記録が来て、照合・報告書・教材にして返す。下の流れがお金。お客様から10台で年300万円が入り、84万円がAIと保存の費用、216万円が残って社員の費用をまかなう。社員1人で約4拠点を超えたら黒字。そして記録が貯まるほど、真似されにくくなります。"],
-  17: ["ツッコミ対策・40秒", "3つのツッコミには、この一言で返す",
-    "よく聞かれる3つの質問への答えです。本当に300万円も払うのか。1台1日" + be + "分減れば元が取れます。想定は35分で、実証で測ります。なぜ赤字が続くのか。人を先に雇うからで、社員1人約4拠点を超えたら黒字になります。だから台数を増やしてもらいます。真似されないか。現場の記録は使うほど貯まり、後から来た会社には移せません。"],
+    "1枚にまとめるとこうなります。上の流れが記録とサービス。お客様の現場から記録が来て、照合・報告書・教材にして返す。下の流れがお金。お客様から10台で年300万円が入り、84万円がAIと保存の費用、216万円が残って社員の費用をまかなう。社員1人で約4拠点を超えたら黒字。そして記録が貯まるほど、他社がすぐには真似できなくなります。"],
+  17: ["ツッコミ対策・50秒", "4つのツッコミには、この一言で返す",
+    "よく聞かれる4つの質問への答えです。本当に300万円も払うのか。1台1日" + be + "分減れば元が取れます。想定は35分で、実証で測ります。なぜ赤字が続くのか。人を先に雇うからで、社員1人約4拠点を超えたら黒字になります。だから台数を増やしてもらいます。真似されないか。現場の記録は使うほど貯まり、後から来た会社には移せません。日立と同じではないか。日立は自社の保守契約の中で、安全や点検にAIを使っています。当社は中堅の電気工事会社の施工の書類と若手の育成に絞り、月額で提供します。"],
   18: ["まとめ・30秒", "300万・216万・4。この3つで話せる",
-    "まとめです。お客様が10台で年300万円払う。216万円が残る。社員1人約4拠点で黒字。この3つの数字で、すべて説明できます。詳しい計算の過程は、別冊の計算詳細版にまとめています。"],
+    `まとめです。お客様が10台で年300万円払う。216万円が残る。社員1人約4拠点で黒字。この3つの数字で、すべて説明できます。10年で見ると、10台のままでも${R10.firstBlack}年目に黒字になります。詳しい計算の過程は、別冊の計算詳細版にまとめています。以上で終わります。ご清聴ありがとうございました。`],
 };
 const NOTES = Object.fromEntries(Object.entries(NOTE_PARTS).map(([n, [t, msg, body]]) => [n, `【${t}】\n要約：${msg}\n\n${body}`]));
 
 async function main() {
   const pres = new pptxgen();
-  const add = await L.setup(pres, "マンガでわかる カンツギのもうけの仕組み", NOTES);
+  const add0 = await L.setup(pres, "マンガでわかる カンツギのもうけの仕組み", NOTES);
+  // 表題欄の左に章を書く
+  const CHAPTER = [[2, "登場人物"], [3, "現場の物語"], [7, "お金の話"], [15, "準備期"], [16, "まとめ"]];
+  const add = (n) => {
+    const s = add0(n);
+    const c = n > 1 && CHAPTER.filter(([p]) => p <= n).pop();
+    if (c) txt(s, c[1], { x: 6.62, y: 5.205, w: 1.28, h: 0.29, size: 7.5, color: L.NAVY, bold: true, align: "center", valign: "middle" });
+    return s;
+  };
 
   const C = {};
   for (const r of ["veteran", "junior", "manager", "founder", "client"])
@@ -75,7 +85,8 @@ async function main() {
   // ---------- 1 表紙 ----------
   {
     const s = add(1);
-    txt(s, "カンツギ　事業計画書　やさしい版", { x: X0, y: 0.35, w: 5.5, h: 0.3, size: 11, color: K.gray700 });
+    s.addImage({ data: await png("kantsugi-logotype-color"), x: X0, y: 0.3, w: 1.7, h: 1.7 * 120 / 560 });
+    txt(s, "事業計画書　やさしい版", { x: X0 + 1.85, y: 0.3, w: 3.5, h: 0.36, size: 11, color: K.gray700, valign: "middle" });
     txt(s, [run("マンガでわかる", { breakLine: true }), run("カンツギの"), run("もうけの仕組み", { color: ACC })], { x: X0, y: 0.68, w: 6.0, h: 1.1, size: 28, bold: true, lsm: 1.1 });
     box(s, { x: 6.75, y: 0.45, w: 2.85, h: 1.25, line: ACC, lw: 2, name: "pass-line" });
     txt(s, "元が取れる条件", { x: 6.95, y: 0.52, w: 2.5, h: 0.28, size: 11, bold: true, color: K.gray700 });
@@ -86,7 +97,7 @@ async function main() {
       box(s, { x, y, w: 2.95, h: 1.0, fill: i === 1 ? K.ink : K.fill, name: "num-" + i });
       const col = i === 1 ? K.paper : K.ink;
       txt(s, [run(String(i + 1) + "  ", { color: ACC, bold: true }), run(a)], { x: x + 0.15, y: y + 0.08, w: 2.7, h: 0.28, size: 11, bold: true, color: col });
-      txt(s, b, { x: x + 0.15, y: y + 0.36, w: 1.55, h: 0.55, size: 22, bold: true, color: i === 1 ? "E3A774" : ACC, valign: "middle" });
+      txt(s, b, { x: x + 0.15, y: y + 0.36, w: 1.55, h: 0.55, size: 22, bold: true, color: i === 1 ? L.YELLOW : ACC, valign: "middle" });
       txt(s, c, { x: x + 1.65, y: y + 0.4, w: 1.25, h: 0.5, size: 8, color: col, valign: "middle" });
     });
     const people = [["veteran-normal", "熟練者"], ["junior-normal", "若手"], ["manager-worried", "工事部長"], ["founder-happy", "社長（わたし）"]];
@@ -95,7 +106,11 @@ async function main() {
       ch(s, k, x, 3.25, 1.5);
       txt(s, n, { x: x - 0.1, y: 4.78, w: 1.45, h: 0.24, size: 9, align: "center", color: K.gray700 });
     });
-    bubble(s, "数字は3つだけ。\nこれで全部、説明できます！", { x: 5.6, y: 3.45, w: 3.4, h: 0.95, tail: "bl", size: 13, bold: true, name: "cover-bubble" });
+    bubble(s, "数字は3つだけ。\nこれで全部、説明できます！", { x: 5.6, y: 3.3, w: 3.4, h: 0.95, tail: "bl", size: 13, bold: true, name: "cover-bubble" });
+    box(s, { x: 6.6, y: 5.2, w: 3.28, h: 0.305, line: L.NAVY });
+    txt(s, [run("件名 ", { color: K.gray700 }), run("カンツギ 事業計画書 やさしい版", { bold: true, color: L.NAVY })], { x: 6.68, y: 5.2, w: 2.6, h: 0.305, size: 8, valign: "middle" });
+    txt(s, "1／18", { x: 9.3, y: 5.2, w: 0.58, h: 0.305, size: 9, bold: true, color: L.NAVY, align: "center", valign: "middle" });
+    s.addShape("line", { x: 9.3, y: 5.2, w: 0, h: 0.305, line: { color: L.NAVY, width: 0.75 } });
   }
 
   // ---------- 2 登場人物 ----------
@@ -120,7 +135,7 @@ async function main() {
       bubble(s, say, { x: x + 0.15, y: top + 2.5, w: cw - 0.3, h: 0.78, tail: "tl", size: 10 });
     });
     box(s, { x: X0, y: 4.72, w: W, h: 0.38, fill: K.fill });
-    txt(s, [run("ポイント：", { bold: true, color: ACC }), run("使うのは現場、払うのは会社。だから「会社にとって得か」で値段を決める")], { x: X0 + 0.15, y: 4.72, w: W - 0.3, h: 0.38, size: 10.5, valign: "middle" });
+    txt(s, [run("ポイント：", { bold: true, color: ACC }), run("使うのは現場、払うのは会社。だから「会社にとって効果があるか」で値段を決める")], { x: X0 + 0.15, y: 4.72, w: W - 0.3, h: 0.38, size: 10.5, valign: "middle" });
   }
 
   // ---------- 3 第1話 困りごと ----------
@@ -150,7 +165,7 @@ async function main() {
     ic(s, "clock", P(3) + 1.4, top + 2.75, 0.5);
     bubble(s, "工事写真と報告書で\n毎晩残業。教える\n時間もない…", { x: P(3) + 0.1, y: top + 0.42, w: pw - 0.2, h: 1.05, tail: "bl", size: 10 });
     box(s, { x: X0, y: 4.72, w: W, h: 0.38, fill: K.ink });
-    txt(s, [run("現実も同じ：", { bold: true, color: "E3A774" }), run("建設業で働く人の36.7%が55歳以上、29歳以下は11.7%（国交省、2024年）。2024年4月から残業にも上限")], { x: X0 + 0.15, y: 4.72, w: W - 0.3, h: 0.38, size: 9, color: K.paper, valign: "middle" });
+    txt(s, [run("現実も同じ：", { bold: true, color: L.YELLOW }), run("建設業で働く人の36.7%が55歳以上、29歳以下は11.7%（国交省、2024年）。2024年4月から残業にも上限")], { x: X0 + 0.15, y: 4.72, w: W - 0.3, h: 0.38, size: 9, color: K.paper, valign: "middle" });
   }
 
   // ---------- 4 第2話 解決 ----------
@@ -193,7 +208,7 @@ async function main() {
     const pw = 2.2, gap = 0.133, top = 1.12, ph = 3.5;
     const P = (i) => X0 + i * (pw + gap);
     panel(s, { x: P(0), y: top, w: pw, h: ph, cap: "① いつもの現場" });
-    box(s, { x: P(0) + 1.25, y: top + 1.55, w: 0.8, h: 1.0, fill: "F3EBDD", line: K.gray500 });
+    box(s, { x: P(0) + 1.25, y: top + 1.55, w: 0.8, h: 1.0, fill: L.PALEY, line: K.gray500 });
     txt(s, "組立図\n（壁）", { x: P(0) + 1.25, y: top + 1.55, w: 0.8, h: 1.0, size: 8.5, align: "center", valign: "middle", color: K.gray700 });
     ch(s, "junior-worried", P(0) + 0.1, top + 2.0, 1.4);
     bubble(s, "壁の図面を見に行って\n戻ったら寸法を\n忘れた…", { x: P(0) + 0.1, y: top + 0.42, w: pw - 0.2, h: 1.0, tail: "bl", size: 9.5 });
@@ -203,8 +218,8 @@ async function main() {
     ch(s, "junior-happy", P(1) + 0.6, top + 1.55, 1.15);
     bubble(s, "実物大の完成形が\nケーブルの横に\n出た！", { x: P(1) + 0.1, y: top + 0.42, w: pw - 0.2, h: 1.0, tail: "bl", size: 9.5 });
     panel(s, { x: P(2), y: top, w: pw, h: ph, cap: "③ 赤を切るか、青か" });
-    s.addShape("line", { x: P(2) + 0.3, y: top + 2.3, w: 1.6, h: 0, line: { color: "C0392B", width: 5 } });
-    s.addShape("line", { x: P(2) + 0.3, y: top + 2.65, w: 1.6, h: 0, line: { color: "2E5C9A", width: 5 } });
+    s.addShape("line", { x: P(2) + 0.3, y: top + 2.3, w: 1.6, h: 0, line: { color: L.RED, width: 5 } });
+    s.addShape("line", { x: P(2) + 0.3, y: top + 2.65, w: 1.6, h: 0, line: { color: "2F6DB5", width: 5 } });
     txt(s, "✂", { x: P(2) + 0.85, y: top + 2.85, w: 0.5, h: 0.45, size: 22, align: "center" });
     bubble(s, "ここは過去にミスあり。\n赤を切れ", { x: P(2) + 0.1, y: top + 0.42, w: pw - 0.2, h: 0.9, tail: "br", size: 10, bold: true, shout: true });
     sfx(s, "ピピッ", { x: P(2) + 0.25, y: top + 1.45, size: 18 });
@@ -213,7 +228,7 @@ async function main() {
     sfx(s, "バチッ", { x: P(3) + 1.1, y: top + 1.4, size: 16 });
     bubble(s, "火花が飛んでも\n目は守られとる", { x: P(3) + 0.1, y: top + 0.42, w: pw - 0.2, h: 0.85, tail: "bl", size: 10 });
     box(s, { x: X0, y: 4.72, w: W, h: 0.38, fill: K.ink });
-    txt(s, [run("約束：", { bold: true, color: "E3A774" }), run("寸法の最終確認はスケールで。ARは「測る道具」ではなく「理解して、間違いに気づく道具」")], { x: X0 + 0.15, y: 4.72, w: W - 0.3, h: 0.38, size: 10, color: K.paper, valign: "middle" });
+    txt(s, [run("約束：", { bold: true, color: L.YELLOW }), run("寸法の最終確認はスケールで。ARは「測る道具」ではなく「理解して、間違いに気づく道具」")], { x: X0 + 0.15, y: 4.72, w: W - 0.3, h: 0.38, size: 10, color: K.paper, valign: "middle" });
   }
 
   // ---------- 6 第4話 どう会う ----------
@@ -238,7 +253,7 @@ async function main() {
     ch(s, "client-happy", P(3) + 1.15, top + 2.1, 1.15);
     bubble(s, "協力会社にも\n同じ形で使って\nもらおう", { x: P(3) + 0.1, y: top + 0.42, w: pw - 0.2, h: 1.0, tail: "bl", size: 10 });
     box(s, { x: X0, y: 4.72, w: W, h: 0.38, fill: K.ink });
-    txt(s, [run("5年の見込み：", { bold: true, color: "E3A774" }), run(`条件に合う約180社を中心に5年で約85拠点（解約を引いて${Y5.sites}）。効果が出た班から台数を増やす`)], { x: X0 + 0.15, y: 4.72, w: W - 0.3, h: 0.38, size: 9.5, color: K.paper, valign: "middle" });
+    txt(s, [run("5年の見込み：", { bold: true, color: L.YELLOW }), run(`条件に合う約180社を中心に5年で約85拠点（解約を引いて${Y5.sites}）。効果が出た班から台数を増やす`)], { x: X0 + 0.15, y: 4.72, w: W - 0.3, h: 0.38, size: 9.5, color: K.paper, valign: "middle" });
   }
 
   // ---------- 5 お金の話1 誰が何にいくら ----------
@@ -286,7 +301,7 @@ async function main() {
       const op = b === "", last = i === eq.length - 1;
       const w = op ? 0.3 : last ? 1.75 : 1.2;
       if (!op) box(s, { x, y: top, w, h: 0.9, fill: last ? K.ink : K.fill });
-      txt(s, a, { x, y: top + (op ? 0.15 : 0.08), w, h: op ? 0.6 : 0.5, size: op ? 20 : 15, bold: true, align: "center", valign: "middle", color: last ? "E3A774" : K.ink });
+      txt(s, a, { x, y: top + (op ? 0.15 : 0.08), w, h: op ? 0.6 : 0.5, size: op ? 20 : 15, bold: true, align: "center", valign: "middle", color: last ? L.YELLOW : K.ink });
       if (!op) txt(s, b, { x, y: top + 0.56, w, h: 0.28, size: 8, align: "center", color: last ? K.paper : K.gray700 });
       x += w + 0.04;
     });
@@ -325,13 +340,13 @@ async function main() {
       txt(s, l.formula, { x: x + 0.08, y: top + 1.72, w: 1.74, h: 0.36, size: 7, color: K.gray700, align: "center" });
     });
     box(s, { x: X0, y: top + 2.25, w: 6.05, h: 0.75, fill: K.ink });
-    txt(s, [run("計画に入れる得 ", { color: K.paper }), run(`年${man(CV.docs)}万円`, { color: "E3A774", fontSize: 20 }), run(`　払うのは${man(CV.cost)}万円 → 約${CV.ratio.toFixed(1)}倍`, { color: K.paper, fontSize: 11 })], { x: X0 + 0.15, y: top + 2.25, w: 5.8, h: 0.75, size: 12, bold: true, valign: "middle" });
+    txt(s, [run("計画に入れる効果 ", { color: K.paper }), run(`年${man(CV.docs)}万円`, { color: L.YELLOW, fontSize: 20 }), run(`　払うのは${man(CV.cost)}万円 → 約${CV.ratio.toFixed(1)}倍`, { color: K.paper, fontSize: 11 })], { x: X0 + 0.15, y: top + 2.25, w: 5.8, h: 0.75, size: 12, bold: true, valign: "middle" });
     ch(s, "manager-happy", 7.9, 1.6, 1.55);
     bubble(s, "確かな分だけで\n元が取れるなら\n安心だ", { x: 6.7, y: 1.12, w: 1.6, h: 0.95, tail: "br", size: 9.5 });
     box(s, { x: 6.7, y: 3.25, w: 2.9, h: 0.9, line: ACC, lw: 1.5 });
     txt(s, [run(`浮く時間 年${man(CV.freedHours)}時間`, { bold: true, breakLine: true }), run("10台分。掛けた班の時間だけを数える", { fontSize: 9 })], { x: 6.8, y: 3.25, w: 2.7, h: 0.9, size: 10.5, valign: "middle" });
     box(s, { x: X0, y: 4.45, w: W, h: 0.5, fill: K.fill });
-    txt(s, [run("大きく言わない：", { bold: true, color: ACC }), run("得をするのは全員ではなく、メガネを掛けた班だけ。手戻りはAIの出来と当社の監修しだいなので、測れてから足す")], { x: X0 + 0.15, y: 4.45, w: W - 0.3, h: 0.5, size: 10, valign: "middle" });
+    txt(s, [run("大きく言わない：", { bold: true, color: ACC }), run("効果を数えるのは全員ではなく、メガネを掛けた班だけ。手戻りはAIの出来と当社の監修しだいなので、測れてから足す")], { x: X0 + 0.15, y: 4.45, w: W - 0.3, h: 0.5, size: 10, valign: "middle" });
   }
 
   // ---------- 7 お金の話3 何が残る ----------
@@ -405,7 +420,7 @@ async function main() {
     const years = R.map((r) => r.year + "年目");
     const ser = [
       ["前の年までのお客様の利用料", R.map((r) => r.existing / 100), K.ink],
-      ["新しいお客様の利用料", R.map((r) => r.newLic / 100), K.gray700],
+      ["新しいお客様の利用料", R.map((r) => r.newLic / 100), ACC],
       ["導入支援", R.map((r) => r.setup / 100), K.gray500],
       ["個社設定", R.map((r) => r.contract / 100), K.rule],
     ];
@@ -417,10 +432,11 @@ async function main() {
     });
     const rx = 6.25, rw = 3.35;
     txt(s, "売上（百万円）", { x: rx, y: 1.15, w: rw, h: 0.26, size: 10.5, bold: true });
-    L.table(s, [["", "売上", "営業利益"], ...R.map((r) => [r.year + "年目", String(M(r.sales)), { text: L.tri(M(r.op)), color: r.op < 0 ? K.gray700 : ACC, bold: r.op > 0 }])],
-      { x: rx, y: 1.45, w: rw, colW: [1.15, 1.1, 1.1], rowH: 0.3, size: 10, name: "sales-op" });
-    ch(s, "founder-happy", rx + 2.05, 3.35, 1.3);
-    bubble(s, "新しいお客様が\n増えるたびに\n大きくなる！", { x: rx, y: 3.4, w: 1.95, h: 0.95, tail: "br", size: 10 });
+    L.table(s, [["", "売上", "営業利益"], ...R.map((r) => [r.year + "年目", String(M(r.sales)), { text: L.tri(M(r.op)), color: r.op < 0 ? L.RED : L.GREEN, bold: true }])],
+      { x: rx, y: 1.45, w: rw, colW: [1.15, 1.1, 1.1], rowH: 0.27, size: 10, name: "sales-op" });
+    txt(s, [run("10年なら：", { bold: true, color: L.NAVY }), run(`${R10.firstBlack}年目に黒字、${R10.cumBack}年目に赤字を回収`)], { x: rx, y: 3.12, w: rw, h: 0.26, size: 9.5, valign: "middle", fill: L.PALEY });
+    ch(s, "founder-happy", rx + 2.05, 3.45, 1.3);
+    bubble(s, "新しいお客様が\n増えるたびに\n大きくなる！", { x: rx, y: 3.5, w: 1.95, h: 0.95, tail: "br", size: 10 });
     txt(s, "新しいお客様は年の途中で始めるので、初年度の利用料は半年分で計算。1年目の3拠点は試験導入（利用料なし）", { x: X0, y: 4.75, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
 
@@ -439,7 +455,7 @@ async function main() {
     box(s, { x: 5.6, y: top, w: 4.0, h: 2.85, fill: K.ink });
     ic(s, "fish", 5.75, top + 0.2, 1.1);
     txt(s, [run("残してくれる粗利", { breakLine: true }), run("LTV（エルティーブイ）", { fontSize: 9 })], { x: 6.95, y: top + 0.25, w: 2.55, h: 0.55, size: 12, bold: true, color: K.paper });
-    txt(s, `約${man(U.ltv(7))}万円`, { x: 6.95, y: top + 0.8, w: 2.6, h: 0.5, size: 24, bold: true, color: "E3A774" });
+    txt(s, `約${man(U.ltv(7))}万円`, { x: 6.95, y: top + 0.8, w: 2.6, h: 0.5, size: 24, bold: true, color: L.YELLOW });
     txt(s, [run(`年${man(U.gpYear)}万円 × 7年`, { breakLine: true }), run(`＋ 導入支援の粗利${man(U.setupGp)}万円`, { breakLine: true }), run("7年は控えめ。解約が年1割なら平均10年続く", { fontSize: 9 })], { x: 5.75, y: top + 1.55, w: 3.7, h: 0.95, size: 10.5, color: K.paper });
     box(s, { x: X0, y: 4.25, w: W, h: 0.8, fill: K.fill });
     ch(s, "client-happy", X0 + 0.1, 4.28, 0.75);
@@ -449,7 +465,7 @@ async function main() {
   // ---------- 10-2 お金の話7 うまくいかなかったら ----------
   {
     const s = add(14);
-    heading(s, "お金の話7　どうすれば黒字？ 鍵は1拠点の台数", "10台のままだと計画どおりでも5年で黒字にならない。15台に増やせれば6割でも5年目に黒字");
+    heading(s, "お金の話7　どうすれば黒字？ 条件は1拠点の台数", "10台のままだと計画どおりでも5年で黒字にならない。15台に増やせれば6割でも5年目に黒字");
     L.gates(s, V);
     txt(s, "上の表：新しい拠点が計画の何割だったら、何年目に黒字になるか（百万円）。下の表：進む・直す・止まるを先に決めておく", { x: X0, y: 4.98, w: W, h: 0.24, size: S.note, color: K.gray500 });
   }
@@ -464,7 +480,7 @@ async function main() {
       const x = X0 + i * 2.33;
       box(s, { x, y: top, w: 2.15, h: 1.5, fill: i === 0 ? K.ink : K.fill, line: i === 0 ? undefined : K.rule });
       const c = i === 0 ? K.paper : K.ink;
-      txt(s, t, { x: x + 0.12, y: top + 0.1, w: 1.9, h: 0.3, size: 11, bold: true, color: i === 0 ? "E3A774" : ACC });
+      txt(s, t, { x: x + 0.12, y: top + 0.1, w: 1.9, h: 0.3, size: 11, bold: true, color: i === 0 ? L.YELLOW : ACC });
       txt(s, a, { x: x + 0.12, y: top + 0.45, w: 1.95, h: 0.5, size: 12, bold: true, color: c });
       txt(s, b, { x: x + 0.12, y: top + 0.98, w: 1.95, h: 0.45, size: 9, color: c });
       if (i < 3) arrow(s, x + 2.17, top + 0.75, 0.15, 0, { lw: 2 });
@@ -486,7 +502,7 @@ async function main() {
   // ---------- 12 全体図 ----------
   {
     const s = add(16);
-    heading(s, "1枚で言うと ─ 上は記録とサービス、下はお金", "記録が貯まるほど真似されにくく、お客様が増えるほど黒字が厚くなる");
+    heading(s, "1枚で言うと ─ 上は記録とサービス、下はお金", "記録が貯まるほど他社がすぐに真似できなくなり、お客様が増えるほど黒字が厚くなる");
     const top = 1.15;
     // customer left, us center, costs right
     box(s, { x: X0, y: top + 0.35, w: 2.1, h: 3.2, line: K.ink, lw: 1.5 });
@@ -500,7 +516,7 @@ async function main() {
     box(s, { x: cx, y: top + 0.35, w: cw, h: 3.2, fill: K.ink });
     txt(s, "カンツギ", { x: cx, y: top + 0.45, w: cw, h: 0.3, size: 12, bold: true, color: K.paper, align: "center" });
     ic(s, "server", cx + 0.95, top + 0.85, 0.7);
-    txt(s, [run("AIが整理", { bold: true, breakLine: true }), run("記録が貯まるほど", { breakLine: true }), run("真似されにくくなる", { color: "E3A774", bold: true })], { x: cx + 0.1, y: top + 1.6, w: cw - 0.2, h: 0.85, size: 10, color: K.paper, align: "center" });
+    txt(s, [run("AIが整理", { bold: true, breakLine: true }), run("記録が貯まるほど、他社が", { breakLine: true }), run("すぐに真似できなくなる", { color: L.YELLOW, bold: true })], { x: cx + 0.1, y: top + 1.6, w: cw - 0.2, h: 0.85, size: 10, color: K.paper, align: "center" });
     txt(s, [run(`1拠点の粗利 ${man(U.gpYear)}万円`, { bold: true, breakLine: true }), run(`（300万円 − AI・保存${man(V.cogsSite())}万円）`)], { x: cx + 0.1, y: top + 2.55, w: cw - 0.2, h: 0.6, size: 9.5, color: K.paper, align: "center" });
 
     // top arrows: service
@@ -527,21 +543,22 @@ async function main() {
   // ---------- 13 ツッコミ対策 ----------
   {
     const s = add(17);
-    heading(s, "よくあるツッコミ3つ ─ この一言で返す", "答えは必ず数字から言う。理由は後");
+    heading(s, "よくあるツッコミ4つ ─ この一言で返す", "答えは必ず数字から言う。理由は後");
     const qa = [
       ["本当に年300万円も払うの？", `1台1日${Math.round(CV.breakEvenMin)}分減れば元が取れます。想定は35分で、実証で測ります`, `${man(CV.cost)}万円÷（10台×240日）÷1時間の人件費`],
       ["なんで赤字が続くの？", "人を先に雇うからです。社員1人約4拠点で黒字。台数を増やして早めます", `${man(PER)}万円÷${man(U.gpYear)}万円＝${(PER / U.gpYear).toFixed(1)}、半年分を見て約4`],
       ["真似されたら終わりでは？", "現場の記録は使うほど貯まり、後から来た会社には移せません", "貯まる・意味づけ・業界の型"],
+      ["日立と同じでは？", "日立は保守契約の中の安全・点検。当社は中堅の電気工事会社の書類と育成を月額で", "公表資料で比べた（本編 p.15）"],
     ];
     qa.forEach(([q, a, why], i) => {
-      const y = 1.15 + i * 1.25;
-      ch(s, "client-think", X0, y, 1.05);
-      bubble(s, q, { x: X0 + 0.95, y: y + 0.1, w: 2.6, h: 0.6, tail: "bl", size: 10.5, bold: true });
-      bubble(s, a, { x: 4.05, y: y + 0.1, w: 4.45, h: 0.75, tail: "br", size: 10.5, fill: K.fill });
-      ch(s, "founder-happy", 8.6, y, 1.05);
-      txt(s, "根拠：" + why, { x: 4.1, y: y + 0.88, w: 4.1, h: 0.24, size: 8.5, color: ACC, bold: true });
+      const y = 1.12 + i * 0.94;
+      ch(s, "client-think", X0, y, 0.85);
+      bubble(s, q, { x: X0 + 0.8, y: y + 0.06, w: 2.75, h: 0.52, tail: "bl", size: 10, bold: true });
+      bubble(s, a, { x: 3.95, y: y + 0.02, w: 4.6, h: 0.58, tail: "br", size: 9.5, fill: K.fill });
+      ch(s, "founder-happy", 8.7, y, 0.85);
+      txt(s, "根拠：" + why, { x: 4.0, y: y + 0.69, w: 4.5, h: 0.2, size: 8, color: ACC, bold: true });
     });
-    txt(s, "左：投資家　右：社長（わたし）。細かい計算は「計算詳細版」に", { x: X0, y: 4.9, w: W, h: 0.24, size: S.note, color: K.gray500 });
+    txt(s, "左：聞き手　右：社長（わたし）。細かい計算は「計算詳細版」に", { x: X0, y: 4.92, w: W, h: 0.24, size: S.note, color: K.gray500 });
   }
 
   // ---------- 14 まとめ ----------
@@ -554,15 +571,16 @@ async function main() {
       const x = X0 + i * 3.1;
       box(s, { x, y: top, w: 2.95, h: 1.55, fill: i === 2 ? K.ink : K.fill });
       const c = i === 2 ? K.paper : K.ink;
-      txt(s, n, { x: x + 0.15, y: top + 0.1, w: 2.7, h: 0.65, size: 30, bold: true, color: i === 2 ? "E3A774" : ACC, valign: "middle" });
+      txt(s, n, { x: x + 0.15, y: top + 0.1, w: 2.7, h: 0.65, size: 30, bold: true, color: i === 2 ? L.YELLOW : ACC, valign: "middle" });
       txt(s, a, { x: x + 0.15, y: top + 0.78, w: 2.7, h: 0.3, size: 11.5, bold: true, color: c });
       txt(s, b, { x: x + 0.15, y: top + 1.1, w: 2.7, h: 0.3, size: 9.5, color: c });
       if (i < 2) arrow(s, x + 2.97, top + 0.78, 0.11, 0, { lw: 2 });
     });
     box(s, { x: X0, y: 2.9, w: W, h: 1.95, line: K.ink, lw: 1.25, name: "script30" });
     txt(s, "30秒で言うと（そのまま読める台本）", { x: X0 + 0.15, y: 2.97, w: 5, h: 0.28, size: 10.5, bold: true, color: ACC });
-    txt(s, `電気工事会社が、メガネ10台で年300万円を払います。掛けた班の書類の時間が1台1日${Math.round(CV.breakEvenMin)}分減れば元が取れ、想定の35分なら約${CV.ratio.toFixed(1)}倍の得です。当社にはAIと保存の費用を引いた${man(U.gpYear)}万円が残り、社員1人で約4拠点を見れば黒字です。人を先に雇うので10台のままでは5年目も赤字ですが、効果が出た班から15台に増やせば${F15}年目に黒字になります。`, { x: X0 + 0.15, y: 3.28, w: W - 1.6, h: 1.5, size: 11, lsm: 1.3 });
+    txt(s, `電気工事会社が、メガネ10台で年300万円を払います。掛けた班の書類の時間が1台1日${Math.round(CV.breakEvenMin)}分減れば元が取れ、想定の35分なら約${CV.ratio.toFixed(1)}倍の効果です。当社にはAIと保存の費用を引いた${man(U.gpYear)}万円が残り、社員1人で約4拠点を見れば黒字です。人を先に雇うので10台のままでは5年目も赤字ですが、効果が出た班から15台に増やせば${F15}年目に黒字になります。10年で見ると、10台のままでも${R10.firstBlack}年目に黒字です。`, { x: X0 + 0.15, y: 3.26, w: W - 1.6, h: 1.55, size: 10.5, lsm: 1.25 });
     ch(s, "founder-happy", 8.35, 3.3, 1.35);
+    txt(s, "ご清聴ありがとうございました", { x: 3.2, y: 4.88, w: 3.3, h: 0.28, size: 11, bold: true, color: L.NAVY, align: "right", valign: "middle" });
   }
 
   fs.mkdirSync(OUT_DIR, { recursive: true });

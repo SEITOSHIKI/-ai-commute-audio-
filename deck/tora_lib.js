@@ -1,13 +1,17 @@
 // Shared primitives for the カンツギ business plan decks (easy manga version and proof version).
-// Same look as build_tora.js: black/white tokens, one copper accent, logotype bottom-right.
+// Default look: black/white tokens, one copper accent, logotype bottom-right.
+// drawing() switches every primitive to the 16枚版 look (tora16_theme.js): drawing frame and title block, navy, safety colors.
 const path = require("path");
 const sharp = require("sharp");
 const T = require("../design-system/georec/pptx-theme.js");
 
 const { color: K, size: S } = T;
-const F = T.font.sans;
+let F = T.font.sans;
 const X0 = 0.4, W = 9.2;
-const ACC = "B8692E";
+let ACC = "B8692E";
+let DRAWING = false;
+// Colors used inside the primitives (text, frames, line art). drawing() replaces them.
+const P = { text: K.ink, frame: K.ink, title: K.ink, line: "#1A1A1A", acc: "#B8692E", hi: "#B8692E", suit: "#1A1A1A", glass: "#B8692E", helmet: "#fff", badge: "#B8692E", bad: "B8692E" };
 const LOGOS = path.join(__dirname, "../design-system/georec/logos");
 const TAGLINE = "現場の勘を、次の担い手へ。";
 
@@ -19,7 +23,7 @@ async function png(svgOrFile, density = 600) {
 
 function txt(slide, text, o) {
   slide.addText(text, {
-    fontFace: F, fontSize: o.size || S.body, color: o.color || K.ink, bold: !!o.bold,
+    fontFace: F, fontSize: o.size || S.body, color: o.color || P.text, bold: !!o.bold,
     x: o.x, y: o.y, w: o.w, h: o.h, margin: o.margin ?? 0, valign: o.valign || "top",
     align: o.align || "left", lineSpacingMultiple: o.lsm || 1.15, paraSpaceAfter: o.psa || 0,
     fill: o.fill ? { color: o.fill } : undefined, isTextBox: true, objectName: o.name, rotate: o.rotate,
@@ -42,13 +46,16 @@ function arrow(slide, x, y, w, h, o = {}) {
 const run = (text, o = {}) => ({ text, options: { fontFace: F, ...o } });
 
 function heading(slide, title, lead) {
+  if (DRAWING && typeof title === "string") title = title.replace(" ─ ", "：");
   const m = /^([①②③④⑤⑥⑦]|第\d話|お金の話\d|根拠\d+|見直し\d+)\s*(.*)$/.exec(title);
   if (m) title = [run(m[1] + " ", { color: ACC }), run(m[2])];
-  txt(slide, title, { x: X0, y: 0.28, w: 8.7, h: 0.42, size: S.slideTitle, bold: true, valign: "middle", name: "title" });
-  if (lead) txt(slide, lead, { x: X0, y: 0.72, w: 8.7, h: 0.28, size: S.lead, color: K.gray700, valign: "middle", name: "lead" });
+  txt(slide, title, { x: X0, y: 0.28, w: 8.7, h: DRAWING ? 0.48 : 0.42, size: DRAWING ? 18.5 : S.slideTitle, bold: true, color: P.title, valign: "middle", name: "title" });
+  if (lead) txt(slide, lead, { x: X0, y: DRAWING ? 0.76 : 0.72, w: 8.7, h: DRAWING ? 0.26 : 0.28, size: DRAWING ? 10.5 : S.lead, color: K.gray700, valign: "middle", name: "lead" });
+  if (DRAWING) hline(slide, X0, 1.04, W, P.frame, 1.25);
 }
 
 function table(slide, rows, o) {
+  if (DRAWING) return require("./tora16_theme.js").table(slide, rows, o);
   const fs = o.size || S.table;
   const body = rows.map((r, i) =>
     r.map((c, j) => {
@@ -80,10 +87,10 @@ function table(slide, rows, o) {
 // ---------- manga parts ----------
 // Panel (koma): thick ink frame, optional narration box at top-left.
 function panel(slide, o) {
-  box(slide, { x: o.x, y: o.y, w: o.w, h: o.h, fill: o.fill || K.paper, line: K.ink, lw: 2.25, name: o.name });
+  box(slide, { x: o.x, y: o.y, w: o.w, h: o.h, fill: o.fill || K.paper, line: P.frame, lw: 2.25, name: o.name });
   if (o.cap) {
     const cw = Math.min(o.w - 0.1, 0.22 + o.cap.length * 0.135);
-    box(slide, { x: o.x, y: o.y, w: cw, h: 0.27, fill: K.ink });
+    box(slide, { x: o.x, y: o.y, w: cw, h: 0.27, fill: P.frame });
     txt(slide, o.cap, { x: o.x + 0.07, y: o.y, w: cw - 0.1, h: 0.27, size: 9, bold: true, color: K.paper, valign: "middle" });
   }
 }
@@ -93,9 +100,9 @@ function bubble(slide, text, o) {
   const flipV = o.tail === "tl" || o.tail === "tr";
   slide.addShape(o.shout ? "wedgeEllipseCallout" : "wedgeRoundRectCallout", {
     x: o.x, y: o.y, w: o.w, h: o.h, flipH, flipV,
-    fill: { color: o.fill || K.paper }, line: { color: K.ink, width: 1.5 }, objectName: o.name,
+    fill: { color: o.fill || K.paper }, line: { color: P.frame, width: 1.5 }, objectName: o.name,
   });
-  txt(slide, text, { x: o.x + 0.08, y: o.y + 0.04, w: o.w - 0.16, h: o.h - 0.08, size: o.size || 10, bold: o.bold, color: o.color || K.ink, align: "center", valign: "middle", lsm: 1.1 });
+  txt(slide, text, { x: o.x + 0.08, y: o.y + 0.04, w: o.w - 0.16, h: o.h - 0.08, size: o.size || 10, bold: o.bold, color: o.color || P.text, align: "center", valign: "middle", lsm: 1.1 });
 }
 // Sound effect / emphasis lettering.
 function sfx(slide, text, o) {
@@ -105,11 +112,11 @@ function sfx(slide, text, o) {
 // ---------- characters (SVG, black line art, copper accent) ----------
 // role: veteran | junior | manager | founder | client ; face: normal | happy | worried | shock | think
 function charSVG(role, face = "normal") {
-  const ink = "#1A1A1A", acc = "#" + ACC, gray = "#8C8C8C", light = "#F2F2F2";
+  const ink = P.line, acc = P.acc, gray = "#8C8C8C", light = "#F2F2F2";
   const parts = [];
   // body
   const suit = role === "manager" || role === "founder" || role === "client";
-  parts.push(`<path d="M28 238 Q30 172 100 166 Q170 172 172 238 Z" fill="${suit ? ink : light}" stroke="${ink}" stroke-width="5"/>`);
+  parts.push(`<path d="M28 238 Q30 172 100 166 Q170 172 172 238 Z" fill="${suit ? P.suit : light}" stroke="${ink}" stroke-width="5"/>`);
   if (suit) {
     parts.push(`<path d="M80 168 L100 196 L120 168 Z" fill="#fff" stroke="${ink}" stroke-width="3"/>`);
     parts.push(`<path d="M94 176 L106 176 L110 222 L100 234 L90 222 Z" fill="${role === "founder" ? acc : gray}"/>`);
@@ -122,11 +129,11 @@ function charSVG(role, face = "normal") {
   parts.push(`<circle cx="100" cy="100" r="56" fill="#fff" stroke="${ink}" stroke-width="5"/>`);
   // hair / helmet
   if (role === "veteran" || role === "junior") {
-    parts.push(`<path d="M40 82 A60 60 0 0 1 160 82 Z" fill="#fff" stroke="${ink}" stroke-width="5"/>`);
+    parts.push(`<path d="M40 82 A60 60 0 0 1 160 82 Z" fill="${P.helmet}" stroke="${ink}" stroke-width="5"/>`);
     parts.push(`<rect x="32" y="76" width="136" height="11" rx="5" fill="${ink}"/>`);
     parts.push(`<path d="M100 24 L100 78" stroke="${ink}" stroke-width="4"/>`);
     if (role === "veteran") {
-      parts.push(`<rect x="88" y="42" width="24" height="20" fill="${acc}"/>`);
+      parts.push(DRAWING ? `<path d="M95 40 h10 v8 h8 v10 h-8 v8 h-10 v-8 h-8 v-10 h8 Z" fill="${P.badge}"/>` : `<rect x="88" y="42" width="24" height="20" fill="${acc}"/>`); // 緑十字
       parts.push(`<path d="M46 104 Q44 122 50 130 M154 104 Q156 122 150 130" stroke="${gray}" stroke-width="8" fill="none"/>`);
     }
   } else if (role === "manager") {
@@ -153,10 +160,10 @@ function charSVG(role, face = "normal") {
   else { parts.push(brow(-22, 3), brow(22, -3)); }
   // glasses
   if (role === "junior") {
-    parts.push(`<rect x="60" y="94" width="36" height="26" rx="4" fill="${ink}" fill-opacity="0.15" stroke="${acc}" stroke-width="5"/>`);
-    parts.push(`<rect x="104" y="94" width="36" height="26" rx="4" fill="${ink}" fill-opacity="0.15" stroke="${acc}" stroke-width="5"/>`);
-    parts.push(`<path d="M96 104 L104 104 M60 102 L46 98 M140 102 L154 98" stroke="${acc}" stroke-width="5"/>`);
-    parts.push(`<circle cx="148" cy="96" r="5" fill="${acc}"/>`);
+    parts.push(`<rect x="60" y="94" width="36" height="26" rx="4" fill="${ink}" fill-opacity="0.15" stroke="${P.glass}" stroke-width="5"/>`);
+    parts.push(`<rect x="104" y="94" width="36" height="26" rx="4" fill="${ink}" fill-opacity="0.15" stroke="${P.glass}" stroke-width="5"/>`);
+    parts.push(`<path d="M96 104 L104 104 M60 102 L46 98 M140 102 L154 98" stroke="${P.glass}" stroke-width="5"/>`);
+    parts.push(`<circle cx="148" cy="96" r="5" fill="${P.glass}"/>`);
   }
   if (role === "manager") {
     parts.push(`<circle cx="78" cy="${ey}" r="15" fill="none" stroke="${ink}" stroke-width="4"/><circle cx="122" cy="${ey}" r="15" fill="none" stroke="${ink}" stroke-width="4"/><path d="M93 ${ey} L107 ${ey}" stroke="${ink}" stroke-width="4"/>`);
@@ -172,25 +179,25 @@ function charSVG(role, face = "normal") {
   // effects
   if (face === "worried") parts.push(`<path d="M166 70 Q176 86 166 94 Q156 86 166 70 Z" fill="#fff" stroke="${ink}" stroke-width="3"/>`);
   if (face === "shock") parts.push(`<path d="M30 40 L44 58 M20 66 L40 72 M170 40 L156 58 M180 66 L160 72" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>`);
-  if (face === "happy") parts.push(`<path d="M170 46 L174 58 L186 62 L174 66 L170 78 L166 66 L154 62 L166 58 Z" fill="${acc}"/>`);
+  if (face === "happy") parts.push(`<path d="M170 46 L174 58 L186 62 L174 66 L170 78 L166 66 L154 62 L166 58 Z" fill="${P.hi}"/>`);
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" width="200" height="240">${parts.join("")}</svg>`;
 }
 
 // Simple pictograms (factory, coin, server, film, report, person-hours)
 function iconSVG(kind) {
-  const ink = "#1A1A1A", acc = "#" + ACC;
+  const ink = P.line, acc = P.acc, hi = P.hi;
   const s = (b) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">${b}</svg>`;
   switch (kind) {
     case "factory": return s(`<path d="M20 180 L20 90 L70 120 L70 90 L120 120 L120 40 L150 40 L150 120 L180 120 L180 180 Z" fill="#fff" stroke="${ink}" stroke-width="8" stroke-linejoin="round"/><rect x="40" y="140" width="22" height="22" fill="${ink}"/><rect x="88" y="140" width="22" height="22" fill="${ink}"/><rect x="136" y="140" width="22" height="22" fill="${ink}"/><path d="M135 30 Q150 10 170 18" stroke="${ink}" stroke-width="6" fill="none"/>`);
-    case "office": return s(`<rect x="34" y="40" width="132" height="140" fill="#fff" stroke="${ink}" stroke-width="8" stroke-linejoin="round"/><path d="M20 180 L180 180" stroke="${ink}" stroke-width="8"/><rect x="56" y="64" width="24" height="22" fill="${ink}"/><rect x="120" y="64" width="24" height="22" fill="${ink}"/><rect x="56" y="104" width="24" height="22" fill="${ink}"/><rect x="120" y="104" width="24" height="22" fill="${ink}"/><rect x="86" y="140" width="28" height="40" fill="${ink}"/><path d="M106 6 L84 40 L102 40 L92 66 L120 30 L102 30 L112 6 Z" fill="${acc}" stroke="${ink}" stroke-width="4" stroke-linejoin="round"/>`);
-    case "coin": return s(`<circle cx="100" cy="100" r="78" fill="${acc}" stroke="${ink}" stroke-width="8"/><circle cx="100" cy="100" r="58" fill="none" stroke="#fff" stroke-width="5"/><path d="M70 62 L100 100 L130 62 M100 100 L100 146 M74 108 L126 108 M74 128 L126 128" stroke="#fff" stroke-width="10" fill="none" stroke-linecap="round"/>`);
+    case "office": return s(`<rect x="34" y="40" width="132" height="140" fill="#fff" stroke="${ink}" stroke-width="8" stroke-linejoin="round"/><path d="M20 180 L180 180" stroke="${ink}" stroke-width="8"/><rect x="56" y="64" width="24" height="22" fill="${ink}"/><rect x="120" y="64" width="24" height="22" fill="${ink}"/><rect x="56" y="104" width="24" height="22" fill="${ink}"/><rect x="120" y="104" width="24" height="22" fill="${ink}"/><rect x="86" y="140" width="28" height="40" fill="${ink}"/><path d="M106 6 L84 40 L102 40 L92 66 L120 30 L102 30 L112 6 Z" fill="${hi}" stroke="${ink}" stroke-width="4" stroke-linejoin="round"/>`);
+    case "coin": return s(`<circle cx="100" cy="100" r="78" fill="${DRAWING ? "#C9A000" : acc}" stroke="${ink}" stroke-width="8"/><circle cx="100" cy="100" r="58" fill="none" stroke="#fff" stroke-width="5"/><path d="M70 62 L100 100 L130 62 M100 100 L100 146 M74 108 L126 108 M74 128 L126 128" stroke="#fff" stroke-width="10" fill="none" stroke-linecap="round"/>`);
     case "server": return s(`<rect x="40" y="24" width="120" height="44" rx="6" fill="#fff" stroke="${ink}" stroke-width="8"/><rect x="40" y="78" width="120" height="44" rx="6" fill="#fff" stroke="${ink}" stroke-width="8"/><rect x="40" y="132" width="120" height="44" rx="6" fill="#fff" stroke="${ink}" stroke-width="8"/><circle cx="64" cy="46" r="7" fill="${ink}"/><circle cx="64" cy="100" r="7" fill="${ink}"/><circle cx="64" cy="154" r="7" fill="${ink}"/><path d="M90 46 L140 46 M90 100 L140 100 M90 154 L140 154" stroke="${ink}" stroke-width="7"/>`);
     case "film": return s(`<rect x="20" y="40" width="160" height="120" rx="10" fill="#fff" stroke="${ink}" stroke-width="8"/><path d="M84 74 L84 126 L128 100 Z" fill="${ink}"/><path d="M20 62 L180 62 M20 138 L180 138" stroke="${ink}" stroke-width="5"/>`);
     case "report": return s(`<path d="M44 20 L130 20 L160 50 L160 180 L44 180 Z" fill="#fff" stroke="${ink}" stroke-width="8" stroke-linejoin="round"/><path d="M130 20 L130 50 L160 50" fill="none" stroke="${ink}" stroke-width="6"/><rect x="62" y="64" width="44" height="34" fill="${ink}"/><path d="M116 70 L142 70 M116 90 L142 90 M62 118 L142 118 M62 138 L142 138 M62 158 L120 158" stroke="${ink}" stroke-width="6"/>`);
-    case "glasses": return s(`<path d="M14 84 L186 84" stroke="${ink}" stroke-width="8"/><rect x="26" y="78" width="66" height="50" rx="10" fill="#1A1A1A" fill-opacity="0.12" stroke="${acc}" stroke-width="9"/><rect x="108" y="78" width="66" height="50" rx="10" fill="#1A1A1A" fill-opacity="0.12" stroke="${acc}" stroke-width="9"/><path d="M92 96 L108 96" stroke="${acc}" stroke-width="9"/><circle cx="170" cy="64" r="10" fill="${ink}"/><circle cx="170" cy="64" r="4" fill="#fff"/>`);
+    case "glasses": return s(`<path d="M14 84 L186 84" stroke="${ink}" stroke-width="8"/><rect x="26" y="78" width="66" height="50" rx="10" fill="#1A1A1A" fill-opacity="0.12" stroke="${P.glass}" stroke-width="9"/><rect x="108" y="78" width="66" height="50" rx="10" fill="#1A1A1A" fill-opacity="0.12" stroke="${P.glass}" stroke-width="9"/><path d="M92 96 L108 96" stroke="${P.glass}" stroke-width="9"/><circle cx="170" cy="64" r="10" fill="${ink}"/><circle cx="170" cy="64" r="4" fill="#fff"/>`);
     case "clock": return s(`<circle cx="100" cy="100" r="76" fill="#fff" stroke="${ink}" stroke-width="8"/><path d="M100 50 L100 100 L136 120" stroke="${ink}" stroke-width="9" fill="none" stroke-linecap="round"/>`);
     case "book": return s(`<path d="M100 50 Q60 30 20 44 L20 164 Q60 150 100 170 Q140 150 180 164 L180 44 Q140 30 100 50 Z" fill="#fff" stroke="${ink}" stroke-width="8" stroke-linejoin="round"/><path d="M100 50 L100 170" stroke="${ink}" stroke-width="6"/><path d="M40 74 L80 80 M40 98 L80 104 M120 80 L160 74 M120 104 L160 98" stroke="${ink}" stroke-width="5"/>`);
-    case "bait": return s(`<path d="M100 20 L100 120 Q100 160 70 160 Q44 160 44 134" stroke="${ink}" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M44 134 L36 150 M44 134 L58 144" stroke="${ink}" stroke-width="8" stroke-linecap="round"/><circle cx="100" cy="30" r="12" fill="${acc}"/>`);
+    case "bait": return s(`<path d="M100 20 L100 120 Q100 160 70 160 Q44 160 44 134" stroke="${ink}" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M44 134 L36 150 M44 134 L58 144" stroke="${ink}" stroke-width="8" stroke-linecap="round"/><circle cx="100" cy="30" r="12" fill="${hi}"/>`);
     case "fish": return s(`<path d="M30 100 Q90 30 150 100 Q90 170 30 100 Z" fill="${acc}" stroke="${ink}" stroke-width="8"/><path d="M150 100 L186 70 L186 130 Z" fill="${acc}" stroke="${ink}" stroke-width="8" stroke-linejoin="round"/><circle cx="62" cy="92" r="9" fill="${ink}"/>`);
   }
   throw new Error("unknown icon " + kind);
@@ -198,6 +205,7 @@ function iconSVG(kind) {
 
 // Masters + slide factory. notes: {n: string}
 async function setup(pres, title, notes) {
+  if (DRAWING) return require("./tora16_theme.js").setup(pres, title, notes);
   pres.layout = T.slide.layout;
   pres.title = title;
   pres.theme = { headFontFace: F, bodyFontFace: F };
@@ -224,7 +232,7 @@ function gates(slide, V, o = {}) {
   const d15 = { devices: 15, mix: { glass: 12, display: 3 } };
   const sc = (k, plan) => V.run({ plan, newSites: V.GROWTH.newSites.map((n) => Math.round(n * k)), contract: V.GROWTH.contract.map((c) => c * k), hireK: k < 1 ? k : undefined });
   const yr = (r) => (r.firstBlack ? r.firstBlack + "年目" : "5年でしない");
-  const cell = (r) => [{ text: yr(r), color: r.firstBlack ? K.ink : ACC, bold: !r.firstBlack }, { text: tri(mil(r.y5.op)), color: r.y5.op < 0 ? ACC : K.ink }, { text: String(mil(r.minCash)), color: r.minCash < 0 ? ACC : K.ink }];
+  const cell = (r) => [{ text: yr(r), color: r.firstBlack ? (DRAWING ? "2E7D32" : K.ink) : P.bad, bold: !r.firstBlack }, { text: tri(mil(r.y5.op)), color: r.y5.op < 0 ? P.bad : K.ink }, { text: String(mil(r.minCash)), color: r.minCash < 0 ? P.bad : K.ink }];
   txt(slide, "新規拠点が計画に届かなかったら（採用も拠点数に合わせて遅らせる・百万円）", { x: X0, y: top, w: W, h: 0.26, size: 10, bold: true });
   const rows = [1, 0.9, 0.8, 0.7, 0.6].map((k) => {
     const a = sc(k), b = sc(k, d15);
@@ -235,13 +243,26 @@ function gates(slide, V, o = {}) {
   txt(slide, "1拠点10台のまま", { x: X0 + 3.0, y: top + 0.3, w: 3.05, h: 0.23, size: 8.5, bold: true, align: "center", valign: "middle", fill: K.fill });
   txt(slide, "1拠点15台に増やせた場合", { x: X0 + 6.05, y: top + 0.3, w: 3.15, h: 0.23, size: 8.5, bold: true, color: ACC, align: "center", valign: "middle", fill: K.fill });
   const gy = top + 2.12;
+  // drawing(): 進む＝緑、直す＝薄い黄、止まる＝赤
+  const go = (t) => (DRAWING ? { text: t, color: "2E7D32", bold: true } : t), fix = (t) => (DRAWING ? { text: t, fill: "FFF4C2" } : t), stop = (t) => (DRAWING ? { text: t, color: "C62828", bold: true } : t);
   txt(slide, "進む・直す・止まるの線（案）", { x: X0, y: gy, w: W, h: 0.26, size: 10, bold: true });
   table(slide, [["時期", "測るもの", "進む", "直す", "止まる"],
-    ["実証（準備期）", "1台1日の削減時間", `${be}分以上`, `15〜${be}分：機能を写真台帳に絞る`, "15分未満：撤退"],
-    ["1年目末", "試験導入3社の本契約", "2社以上", "1社：値段と顧客を見直す", "0社：撤退か方向転換"],
-    ["2年目末", "新規拠点・1拠点の台数", "5拠点以上・平均12台", "5拠点未満：採用を止める", "─"],
-    ["3年目", "追加の5,000万円を入れるか", "継続率90%以上", "未達：追加額と採用を絞る", "─"]],
+    ["実証（準備期）", "1台1日の削減時間", go(`${be}分以上`), fix(`15〜${be}分：機能を写真台帳に絞る`), stop("15分未満：撤退")],
+    ["1年目末", "試験導入3社の本契約", go("2社以上"), fix("1社：値段と顧客を見直す"), stop("0社：撤退か方向転換")],
+    ["2年目末", "新規拠点・1拠点の台数", go("5拠点以上・平均12台"), fix("5拠点未満：採用を止める"), "─"],
+    ["3年目", "追加の5,000万円を入れるか", go("継続率90%以上"), fix("未達：追加額と採用を絞る"), "─"]],
     { x: X0, y: gy + 0.28, w: W, colW: [1.2, 1.9, 1.6, 2.5, 2.0], rowH: 0.25, size: 8.5, leftCols: [1, 2, 3, 4], name: "gates" });
 }
 
-module.exports = { T, K, S, F, X0, W, ACC, TAGLINE, png, txt, box, hline, arrow, run, heading, table, panel, bubble, sfx, charSVG, iconSVG, setup, fmt, tri, gates };
+// Switch to the 16枚版 look. Call before destructuring the exports: const L = require("./tora_lib.js").drawing();
+function drawing() {
+  DRAWING = true;
+  F = "BIZ UDPGothic"; ACC = "2F6DB5";
+  Object.assign(K, { ink: "1B365D", gray700: "4A5563", gray500: "7B8794", rule: "B8C4D0", fill: "EAF0F6" });
+  Object.assign(P, { text: "1F2933", frame: "1B365D", title: "1B365D", line: "#1F2933", acc: "#2F6DB5", hi: "#F5C400", suit: "#1B365D", glass: "#2F6DB5", helmet: "#F5C400", badge: "#2E7D32", bad: "C62828" });
+  Object.assign(module.exports, { F, ACC, DRAWING: true });
+  return module.exports;
+}
+
+module.exports = { T, K, S, F, X0, W, ACC, TAGLINE, png, txt, box, hline, arrow, run, heading, table, panel, bubble, sfx, charSVG, iconSVG, setup, fmt, tri, gates, drawing, DRAWING: false,
+  YELLOW: "F5C400", PALEY: "FFF4C2", GREEN: "2E7D32", RED: "C62828", NAVY: "1B365D" };

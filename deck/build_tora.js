@@ -19,7 +19,8 @@ const DP = { value: "5〜8", price: "9〜13", device: "10・26・29", sales: "14
 const mil = (v) => Math.round(v / 100); // 万円 → 百万円
 const CV = customerValue(), NV = nationValue();
 const V = require("./tora_v2.js");
-const L = require("./tora_lib.js");
+const L = require("./tora_lib.js").drawing(); // 16枚版と同じ見た目（K を紺・安全色に切り替える）
+const TH = require("./tora16_theme.js");
 const man = (v) => Math.round(v).toLocaleString("en-US");
 const oku = (v) => (v >= 10000 ? Math.floor(v / 10000) + "億" + (v % 10000 ? man(v % 10000) + "万円" : "円") : man(v) + "万円");
 const be = Math.round(CV.breakEvenMin); // お客様が元を取る1台1日の分数
@@ -31,7 +32,7 @@ const TEN = [["計画どおり（10台）", {}], ["1拠点15台", { plan: { devi
   ["AI・保存費が2倍", { perDevice: V.cloudPerDevice * 2 }]].map(([n, o]) => { const r = V.run({ years: 10, ...o }); return { n, fb: r.firstBlack, cb: r.cumBack, min: r.minCash }; });
 const IMPACT = (() => { const siteYears = R10.rows.reduce((a, r) => a + r.sites, 0); return { siteYears, hours: siteYears * CV.freedHours, value: siteYears * CV.docs }; })();
 const LOGOS = path.join(__dirname, "../design-system/georec/logos");
-const F = T.font.sans;
+const F = "BIZ UDPGothic";
 const X0 = 0.4, W = 9.2;
 
 async function logo(name) {
@@ -42,7 +43,7 @@ async function logo(name) {
 // ---------- primitives (fresh option objects every call) ----------
 function txt(slide, text, o) {
   slide.addText(text, {
-    fontFace: F, fontSize: o.size || S.body, color: o.color || K.ink, bold: !!o.bold,
+    fontFace: F, fontSize: o.size || S.body, color: o.color || "1F2933", bold: !!o.bold,
     x: o.x, y: o.y, w: o.w, h: o.h, margin: o.margin ?? 0, valign: o.valign || "top",
     align: o.align || "left", lineSpacingMultiple: o.lsm || 1.15, paraSpaceAfter: o.psa || 0,
     fill: o.fill ? { color: o.fill } : undefined, isTextBox: true, objectName: o.name,
@@ -64,48 +65,26 @@ function arrow(slide, x, y, w, h, o = {}) {
 }
 const run = (text, o = {}) => ({ text, options: { fontFace: F, ...o } });
 
-const ACC = "B8692E"; // copper: the conductor of a cable; the one accent of the pitch deck
+const ACC = "2F6DB5"; // 青（16枚版と同じ）。赤字は RED、黒字・進むは GREEN
 function detailRef(slide, pages) { // 右上に「詳細版 p.○」を出す
-  txt(slide, "計算の詳細：詳細版 p." + pages, { x: 6.6, y: 0.06, w: 3.0, h: 0.2, size: 8, color: K.gray500, align: "right", valign: "middle" });
+  txt(slide, "計算の詳細：詳細版 p." + pages, { x: 6.6, y: 0.13, w: 3.0, h: 0.16, size: 7.5, color: K.gray500, align: "right", valign: "middle" });
 }
+// 見出しと表は16枚版（tora16_theme.js）と同じ。見出しは「項目：結論」
 function heading(slide, title, lead) {
-  const m = /^([①②③④⑤⑥⑦])\s*(.*)$/.exec(title);
-  if (m) title = [run(m[1] + " ", { color: ACC }), run(m[2])];
-  txt(slide, title, { x: X0, y: 0.28, w: 8.7, h: 0.42, size: S.slideTitle, bold: true, valign: "middle", name: "title" });
-  if (lead) txt(slide, lead, { x: X0, y: 0.72, w: 8.7, h: 0.28, size: S.lead, color: K.gray700, valign: "middle", name: "lead" });
+  TH.heading(slide, typeof title === "string" ? title.replace(" ─ ", "：") : title, lead);
 }
 
-// Simple ruled table: header on fill with strong ink rule, body rows with light rules.
+// 表：紺の見出し行。emCol の列は薄い青、mutedCol の列は灰色の文字
 function table(slide, rows, o) {
-  const fs = o.size || S.table;
-  const body = rows.map((r, i) =>
-    r.map((c, j) => {
-      const cell = typeof c === "object" ? c : { text: String(c) };
-      const head = i === 0;
-      const strong = o.strongRows && o.strongRows.includes(i);
-      const em = o.emCol !== undefined && j === o.emCol;
-      return {
-        text: cell.text,
-        options: {
-          fontFace: F, fontSize: fs, color: cell.color || ((o.mutedCol === j && !head) ? K.gray700 : K.ink),
-          bold: head || strong || !!cell.bold,
-          align: j === 0 || (o.leftCols || []).includes(j) ? "left" : (o.align || "right"),
-          valign: "middle",
-          fill: { color: head || em ? K.fill : K.paper },
-          margin: [0.02, 0.06, 0.02, 0.06],
-          border: [
-            { type: strong ? "solid" : "none", color: K.ink, pt: T.stroke.strong },
-            { type: "none" },
-            head ? { type: "solid", color: K.ink, pt: T.stroke.strong } : { type: "solid", color: K.rule, pt: T.stroke.rule },
-            { type: "none" },
-          ],
-        },
-      };
-    })
-  );
-  slide.addTable(body, { x: o.x, y: o.y, w: o.w, colW: o.colW, rowH: o.rowH, objectName: o.name });
+  const prep = rows.map((r, i) => r.map((c, j) => {
+    if (i === 0) return c;
+    const cell = typeof c === "object" ? { ...c } : { text: String(c) };
+    if (o.emCol === j && !cell.fill) cell.fill = TH.PALE;
+    if (o.mutedCol === j && !cell.color) cell.color = K.gray700;
+    return cell;
+  }));
+  TH.table(slide, prep, o);
 }
-
 
 const TAGLINE = "現場の勘を、次の担い手へ。";
 
@@ -121,14 +100,14 @@ const NOTE_LIST = [
   ["現場の勘が消えるのを見てきた。市場・技術・自分の3つの理由",
     "なぜこの事業を選んだか。理由は3つです。市場の理由。建設業は55歳以上が36.7%、2024年から残業に上限があり、書類と育成に回す人がいません。お金を払ってでも解きたい問題があります。技術の理由。見て理解するAIが実用になり、カメラ付きのAIグラスが普段のメガネと同じ約50グラムになりました。一日中掛けていられる時代が来ています。そして自分の理由。私は電線メーカーで地中送電線の施工管理を5年やりました。ベテランの判断が手順書に書かれないまま、退職とともに消えていくのを見てきました。現場とAIの両方がわかる人は多くありません。だから私がやります。想いは社名の通りです。途切れそうな現場の勘を金継ぎのように継いで、人が減っても日本の現場の品質を落とさない。"],
   ["AIは事務作業の支援から、作業者の「目と手」の支援へ", "背景です。これまでAIは、管理者の報告書や議事録といった事務作業の効率化に使われてきました。考える・書くAIは、もう十分に実用の水準です。次は、これまで代わりが利かなかった肉体労働、とくに作業者の暗黙知を支える番です。安全・品質・施工手順の作業支援。人の目は口ほどに物を言うと言いますが、次に来るのは「見るAI」だと考えています。その入口が、普段のメガネと同じ軽さのAIグラスです。スマホ世代の次の、ARグラス世代が憧れる施工のやり方をつくります。"], ["残業の上限と高齢化で、書類と育成に回す人がいない", "対象のお客様は三人です。一人目は、現場で孤軍奮闘するDX推進担当者。二人目は、施工管理者と電工。工事写真の整理と報告書に毎日追われ、聞ける熟練者もいない。三人目は、お金を出す工事部長や社長。2024年4月から建設業にも残業の上限がかかり、人を増やせない。建設業で働く人の36.7%が55歳以上、29歳以下は11.7%しかいません。"], ["手戻りだけで建設全体に年1.5兆円。勘の喪失は国の損失", "思いだけの話ではありません。お金で見ると、建設投資は年約75兆円。手戻り、つまりやり直しの費用は、海外の研究で工事費の0.4%から6%と言われています。控えめに2%とすると、建設全体で年約1.5兆円、電気工事だけで年約2,400億円がやり直しに消えています。そして建設業で働く人の36.7%、約175万人が55歳以上です。熟練者の判断が消えると、この手戻りが増え、残業の上限の中で受けられる工事も減ります。現場の勘を残すことは、この損失を防ぐことです。"], ["記録は自動、渡す先は三つ。データが貯まるほど真似されにくくなる", "解決策です。作業者の一人称の動画と会話を撮り続け、AIが整理し、若手には現物に重ねて、管理者には報告書として、次の担い手には教材として渡します。真似されにくい理由は三つ。図面に現れない現場処置の記録は、使うほど貯まり、後から来た会社には移せません。映像のどこが重要かを見分ける意味づけは、施工の経験者にしかできません。そして、電気工事の工種ごとの手順と報告書の型を、業界で最初に揃えます。"],
-  ["1拠点10台で年約" + man(Math.round(CV.docs / 10) * 10) + "万円。払う額の約" + CV.ratio.toFixed(1) + "倍。1台1日" + be + "分減れば元が取れる",
-    `お客様が得する額です。得をするのは、AIグラスを掛けた班だけです。1拠点に10台、1班に1台を職長が掛けます。1台で1日、職長の日報と撮影が15分、施工管理者の写真整理と写真台帳が20分減ると、統計から出した時給で、年約${man(Math.round(CV.docs / 10) * 10)}万円です。お客様が払うのは、当社への年300万円とグラスのリース約${man(V.leaseSite())}万円で、約${man(CV.cost)}万円。得はその約${CV.ratio.toFixed(1)}倍です。逆に言うと、1台1日${be}分減れば元が取れます。ここを実証の合格ラインにします。手戻りの削減は、実証で測れたら上乗せし、そのときは約${CV.ratioUp.toFixed(1)}倍です。新人の指導は金額にせず、独り立ちまでの月数で測ります。計算の過程は詳細版の5〜8ページにあります。`],
+  ["1拠点10台で年約" + man(Math.round(CV.docs / 10) * 10) + "万円。支払いの約" + CV.ratio.toFixed(1) + "倍。1台1日" + be + "分減れば元が取れる",
+    `お客様の効果です。効果は、AIグラスを掛けた班の分だけで数えます。1拠点に10台、1班に1台を職長が掛けます。1台で1日、職長の日報と撮影が15分、施工管理者の写真整理と写真台帳が20分減ると、統計から出した時給で、年約${man(Math.round(CV.docs / 10) * 10)}万円です。お客様が払うのは、当社への年300万円とグラスのリース約${man(V.leaseSite())}万円で、約${man(CV.cost)}万円。得はその約${CV.ratio.toFixed(1)}倍です。逆に言うと、1台1日${be}分減れば元が取れます。ここを実証の合格ラインにします。手戻りの削減は、実証で測れたら上乗せし、そのときは約${CV.ratioUp.toFixed(1)}倍です。新人の指導は金額にせず、独り立ちまでの月数で測ります。計算の過程は詳細版の5〜8ページにあります。`],
   ["壁の図面を、手元に実物大で出す。ミスしやすい所では止める", "ARグラスで何が変わるか。今の現場では、2メートル近いケーブルのジョイントの組立図を、わら半紙で壁に貼って施工しています。壁を見に行き、手元に戻り、寸法を思い出して測る。この往復が、思い込みと記憶違いのミスを生みます。ARなら、実物大・立体・工程ごとの完成形を手元に出せます。過去のミス事例を学習させておけば、間違えやすい所で、赤を切るか青を切るかのように、音声とレーザーポインターで止められます。グラスは火花や異物から目を守る役目も果たします。ただし寸法の最終確認はスケールで行います。測る道具ではなく、理解して間違いに気づく道具です。"], ["ベテランが解釈を教え、AIが育つ。人が抜けても資産が残る", "AIが育つ仕組みです。まず一人称で撮る。ベテランの管理者が、この場面が大事だと口頭で教える。AIが必要な場面を切り取って報告する。意味のあるデータに絞って集める。それを別の作業へ広げる。このループが回るほど賢くなります。その結果、報連相が口頭から自動に変わり、危険箇所の注意や、30分作業したら休憩の声かけ、VRの施工シミュレーターにも使えます。作業者が抜けても、管理者が抜けても、現場を解釈できるAIという資産が残ります。"], ["デモ：図面との差異を見つけ、報告書が自動でできる", "実際の画面です。ケーブル接続の現場で、若手が処理した半導電層が図面より8ミリ短いことを検出しました。遠隔の熟練者が、テープの位置から測り直すよう指示します。その判断も記録されます。管理者の画面では、手順ごとに写真が自動で割り当てられ、報告書ができていきます。作業者が報告書に使った時間はゼロです。"],
   ["普段のメガネの軽さのAIグラスを、1班に1台、職長が掛ける",
     "端末と使い方です。当社はグラスそのものは作りません。標準は、普段のメガネと同じ約50グラムのカメラ付きAIグラスです。誰が掛けるか。電工全員ではなく、1班に1台、職長が掛けます。1拠点で5現場に2班ずつ、10台です。どこで撮るか。作業エリアだけで、休憩や移動中は撮りません。何を撮るか。録画は端末に残し、作業の区切り、声の合図、検査の場面だけを短く切り出してAIに送ります。手元に図面を出す班だけ、表示付きのARグラスを使います。粉じんや高所の厳しい現場では、RealWearのような産業用のヘッドセットも選べるようにします。端末が進化したら乗り換えられる設計にし、当社はアプリとAIとデータ基盤を作ります。"],
   ["施工管理アプリは「人が入力する器」、産業用ヘッドセットは「人が見て判断」。当社は「自動で記録し、判断を渡す」",
     "競合です。工事写真や施工管理のアプリは、ANDPAD、SPIDERPLUS、蔵衛門など、すでに広く使われています。ただ、どれも人が撮って入力する器です。もう一つの競合が、RealWearのような産業用のヘッドセットと、遠隔臨場のウェアラブルカメラです。両手が空いたまま映像を記録し、遠くの熟練者とつなぐ点で、私たちと方向は近い。ただ、映像を見て判断するのは人で、報告書や教材にはなりません。RealWearも音声で操作するAIを載せ始めており、日立などの大手もウェアラブルカメラと生成AIの書類作成支援を開発しています。最大の脅威は、こうした会社が自動報告を加えることです。だから競わずにつなぎます。端末はRealWearも選べるようにし、報告書は各社の形式で出力します。当社は、電気工事の判断の記録と、施工経験者の監修で選ばれます。"],
-  ["日立AI Safetyと方向は同じ。だから施工・中堅・書類と技能継承に領域をずらす", "正直に申し上げると、ほぼ同じ方向のサービスがあります。日立製作所、日立ビルシステム、日立パワーソリューションズが2025年10月に発表したAI Safetyです。ウェアラブルカメラの映像をAIが解析し、安全アラート、チャットボット、作業の案内、報告書の作成までを目指しています。11月からは日立ビルシステムの全国の現場で、数千人の技術者が使い始めました。技術と規模では、私たちは勝てません。だから領域をずらします。日立はビル設備の保守と安全から入っています。私たちは中堅の電気工事会社の、施工の現場から入ります。第一の価値は安全ではなく、写真台帳や検査記録といった書類の削減と、技能の継承です。報告書は電力会社や官公庁など発注者ごとの書式で出し、電気工事の工種の型を、施工経験者の監修で先に揃えます。もし日立が施工や中堅向けに来たら、競わずに提携も選びます。勝負の窓は2〜3年と見て、型とデータを先に貯めます。"],
+  ["日立AI Safetyと方向は同じ。だから施工・中堅・書類と技能継承に領域をずらす", "先にお伝えすると、ほぼ同じ方向のサービスがあります。日立製作所、日立ビルシステム、日立パワーソリューションズが2025年10月に発表したAI Safetyです。ウェアラブルカメラの映像をAIが解析し、安全アラート、チャットボット、作業の案内、報告書の作成までを目指しています。11月からは日立ビルシステムの全国の現場で、数千人の技術者が使い始めました。技術と規模では、私たちは勝てません。だから領域をずらします。日立はビル設備の保守と安全から入っています。私たちは中堅の電気工事会社の、施工の現場から入ります。第一の価値は安全ではなく、写真台帳や検査記録といった書類の削減と、技能の継承です。報告書は電力会社や官公庁など発注者ごとの書式で出し、電気工事の工種の型を、施工経験者の監修で先に揃えます。もし日立が施工や中堅向けに来たら、競わずに提携も選びます。勝負の窓は2〜3年と見て、型とデータを先に貯めます。"],
   ["5年目" + Y5.staff + "人。現場監修とコンサル部隊を社内に持つ。私は型と判断の基準をつくる",
     `どんなスタッフと働くかです。5年目に${Y5.staff}人の体制にします。核は3つの役割です。映像AIとデータ基盤をつくるCTOとエンジニア。電気工事の施工管理を10年以上経験し、映像のどこが大事かを意味づける現場監修。そして、お客様の現場に入って導入し、各社の報告書の形や既存のシステムとの連携を設定する導入コンサルタントです。この設定は外部に委託せず、社内のコンサル部隊が行います。そうすることで、各社の帳票の型が当社の知見として貯まり、製品に戻せます。私の役割は、最初の営業と現場監修の統括、そして理念と判断の基準をつくることです。私は電線メーカーで地中送電線の施工管理を5年やり、独学でAIの仕組みを作ってきました。足りないところは、社外の技術顧問と業界の顧問、グラスのメーカーや大学と組んで補います。`],
   ["現場の勘を、次の担い手へ。監視ではなく、技術を残す仕組み",
@@ -140,10 +119,10 @@ const NOTE_LIST = [
   ["売上は拠点×月25万円で積み上がる。解約は年10%で引く",
     `売上と費用です。売上は、続いている拠点かける月25万円の利用料が積み上がる形で、解約は毎年10%で引いています。5年目の売上は約${man(Y5.sales / 100)}百万円、月にすると約${man(Y5.sales / 12)}万円。このほか、大手のお客様の基幹システムとの連携などの個社設定を、当社の導入コンサルタントが有償で行います。費用の中心は人件費で、役割ごとの年収に会社負担を足し、採用費と顧問料、AIの学習の計算費も入れています。所在地は川崎市を考えています。羽田・新幹線に近く、関東一円の電気工事会社に日帰りで出られます。`],
   ["10台のままでは5年目でも届かない。足りないのは約" + gapSites + "拠点分",
-    `損益分岐点です。正直に申し上げると、1拠点10台のままでは5年目でも届きません。販管費を粗利率で割った損益分岐点売上は、5年目で約${man(Y5.bep / 100)}百万円、売上は約${man(Y5.sales / 100)}百万円で、その${Math.round(Y5.sales / Y5.bep * 100)}%です。足りないのは、1拠点の粗利${man(U.gpYear)}万円で数えて約${gapSites}拠点分。人で見ると、社員1人の販管費約${man(Y5.sga / Y5.staff)}万円を1拠点の粗利で割って約${(Y5.sga / Y5.staff / U.gpYear).toFixed(1)}拠点。新しい拠点は初年度に半年分しか払わないので、期末で1人約4拠点が目安ですが、5年目は${Y5.sitesPerStaff.toFixed(2)}です。人を先に雇う計画なので、ここを越えるのは、1拠点の台数を増やしたときか、採用を抑えた6年目以降です。`],
+    `損益分岐点です。正直に言うと、1拠点10台のままでは5年目でも届きません。販管費を粗利率で割った損益分岐点売上は、5年目で約${man(Y5.bep / 100)}百万円、売上は約${man(Y5.sales / 100)}百万円で、その${Math.round(Y5.sales / Y5.bep * 100)}%です。足りないのは、1拠点の粗利${man(U.gpYear)}万円で数えて約${gapSites}拠点分。人で見ると、社員1人の販管費約${man(Y5.sga / Y5.staff)}万円を1拠点の粗利で割って約${(Y5.sga / Y5.staff / U.gpYear).toFixed(1)}拠点。新しい拠点は初年度に半年分しか払わないので、期末で1人約4拠点が目安ですが、5年目は${Y5.sitesPerStaff.toFixed(2)}です。人を先に雇う計画なので、ここを越えるのは、1拠点の台数を増やしたときか、採用を抑えた6年目以降です。`],
   ["自己資金を段階に分けて入れる。線を越えたときだけ次を入れる",
     `資金計画です。課題の前提どおり、自己資金でまかないます。準備期に500万円、実証に合格したら1年目に2億円、3年目に撤退ラインを越えていれば5,000万円を追加し、合計約2.55億円です。5年間の赤字の累計が最も深くて約${(-PLAN.cumPeak / 1e4).toFixed(1)}億円なので、それに固定費3か月分の最低残高と遅れへの備えを足しました。現金残高は最も薄い年でも約${man(Math.round(PLAN.minCash / 100) * 100)}万円です。資金が豊富でも一度に使わず、線を越えたときだけ次を入れます。利用料は年額前払い、導入支援は着手金をいただき、黒字倒産を防ぎます。`],
-  ["黒字の鍵は拠点数より、1拠点の台数。止まる線も先に決める",
+  ["黒字化の条件は、拠点数より1拠点の台数。止まる線も先に決める",
     `では、どうすれば黒字になるか。同じ計算で確かめました。1拠点10台のままだと、計画どおりに拠点が増えても5年以内に黒字になりません。ところが、効果が出た班から台数を増やし、1拠点15台にできれば、新規が計画の6割でも5年目に黒字です。黒字の鍵は、拠点の数より、1拠点で使ってもらう台数です。そして、進むか止まるかの線を先に決めます。実証で1台1日${be}分以上減れば進む、15分未満なら撤退。1年目の終わりに試験導入3社のうち2社以上が本契約なら進む。2年目の終わりに平均12台に届かなければ採用を止め、3年目に継続率90%を越えていれば追加の資金を入れます。`],
   ["年ごとに、何をして、いくら売り、いくら残るか",
     `年単位の計画です。準備期は試作品と1拠点の実証。1年目は3社の試験導入で記録と報告の自動化、2年目は本契約に切り替えて${PR[1].sites}拠点、3年目は図面との照合を加え、大手1社を事例にして${PR[2].sites}拠点、4年目は表示付きグラスで手元ARを1工種から、5年目は教材化と電線工場への試験導入で${Y5.sites}拠点です。社員は${PR[0].staff}人から${Y5.staff}人、売上は約${mil(PR[0].sales)}百万円から約${mil(Y5.sales)}百万円。営業損益は5年間赤字で、5年目は約${mil(-Y5.op)}百万円の赤字です。黒字化には1拠点15台への拡大が条件です。`],
@@ -156,9 +135,9 @@ const NOTE_LIST = [
   ["準備期の6か月で、最初の1拠点を動かす",
     `準備期の6か月です。最初の課題、効果が出るかを確かめます。費用は約500万円。試作品の開発に250万円、グラスに80万円、1拠点での実証に100万円、設立と契約に40万円、予備30万円です。自己資金でまかない、私の給料はゼロです。3か月で試作品、6か月で実証の結果を出し、1台1日${be}分減ったか、グラスで1日記録できるかを確かめます。合格したら、1年目の2億円を入れて採用を始めます。`],
   ["最大のリスクは自分。だから役割と判断基準を先に決めておく",
-    "最後にリスクです。最大のリスクは、私自身が律速になること。だから役割を絞り、判断の基準を先に決めて、私がいなくても回る会社にします。進むかどうかは、思いではなく数字で決めます。そのうえで、私がこの事業を続けたい理由をお話しします。"],
-  ["儲けより、残したいもの。黒字は目的ではなく、続けるための条件",
-    `最後に、私の願いです。10年続ければ、書類に使っていた約${man(Math.round(IMPACT.hours / 1e4))}万時間が、現場と若手の指導に戻ります。価値にして約${Math.round(IMPACT.value / 1e4)}億円です。私にとって、利益は目的ではなく、続けるための条件です。配当は求めず、利益は現場の支援と開発に戻します。自己資金は、見返りを求めない投資です。クラウドファンディングのように、共感してくださる工事会社や職人、業界団体と一緒に育てたい。記録から作った教材の一部は、業界と学校に無償で公開します。それでも資金は有限なので、止まる線は守ります。続けられる形を探し続けることが、私の責任です。日本の品質を支えてきた現場の勘を、人に依存しない形で次の担い手へ。私の資金と時間は、そのための種です。最初の一歩として、6か月で最初の1拠点を動かします。`],
+    "最後にリスクです。最大のリスクは、私自身がボトルネックになること。だから役割を絞り、判断の基準を先に決めて、私がいなくても回る会社にします。進むかどうかは、思いではなく数字で決めます。そのうえで、私がこの事業を続けたい理由をお話しします。"],
+  ["事業への思い。黒字は目的ではなく、続けるための条件",
+    `最後に、私の願いです。10年続ければ、書類に使っていた約${man(Math.round(IMPACT.hours / 1e4))}万時間が、現場と若手の指導に戻ります。価値にして約${Math.round(IMPACT.value / 1e4)}億円です。私にとって、利益は目的ではなく、続けるための条件です。配当は求めず、利益は現場の支援と開発に戻します。自己資金は、見返りを求めない投資です。クラウドファンディングのように、共感してくださる工事会社や職人、業界団体と一緒に育てたい。記録から作った教材の一部は、業界と学校に無償で公開します。それでも資金は有限なので、止まる線は守ります。続けられる形を探し続けることが、私の責任です。日本の品質を支えてきた現場の勘を、人に依存しない形で次の担い手へ。私の資金と時間は、そのための種です。最初の一歩として、6か月で最初の1拠点を動かします。ご清聴ありがとうございました。`],
 ];
 
 // 時間は台本の文字数から自動で出す（1秒あたり約8.5文字）
@@ -180,43 +159,38 @@ const chap = (n, t) => `${n} ${t}`;
 
 async function main() {
   const pres = new pptxgen();
-  pres.layout = T.slide.layout;
-  pres.title = "株式会社カンツギ 事業計画書";
-  pres.theme = { headFontFace: F, bodyFontFace: F };
-
+  const add = await TH.setup(pres, "株式会社カンツギ 事業計画書", NOTES);
   const markBlack = await logo("kantsugi-cube-mono");
   const markWhite = await logo("kantsugi-cube-reverse");
   const wordWhite = await logo("kantsugi-logotype-reverse");
   const logoColor = await logo("kantsugi-logotype-color");
 
-  pres.defineSlideMaster({
-    title: "GR_CONTENT",
-    background: { color: K.paper },
-    objects: [
-      { image: { x: 8.15, y: 5.2, w: 1.45, h: 1.45 * 120 / 560, data: logoColor } },
-      { text: { text: TAGLINE, options: { x: 0.8, y: 5.29, w: 3.5, h: 0.22, fontFace: F, fontSize: S.footer, color: K.gray500, align: "left", margin: 0, valign: "middle" } } },
-    ],
-    slideNumber: { x: 0.4, y: 5.29, w: 0.35, h: 0.22, fontFace: F, fontSize: S.footer, color: K.gray500, align: "left", margin: 0 },
-  });
-  pres.defineSlideMaster({ title: "GR_COVER", background: { color: K.paper }, objects: [{ image: { x: 8.15, y: 5.2, w: 1.45, h: 1.45 * 120 / 560, data: logoColor } }] });
-  const add = (n) => { const s = pres.addSlide({ masterName: n === 1 ? "GR_COVER" : "GR_CONTENT" }); s.addNotes(NOTES[n]); return s; };
-
   // ---------- Slide 1 表紙 ----------
   {
     const s = add(1);
-    box(s, { x: 0, y: 0, w: 3.6, h: 5.625, fill: K.ink, name: "cover-panel" });
-    s.addImage({ data: wordWhite, x: 0.35, y: 1.05, w: 3.0, h: 3.0 * 120 / 560 });
-    txt(s, "現場の勘を、\n次の担い手へ。", { x: 0.4, y: 2.15, w: 3.0, h: 0.85, size: 20, bold: true, color: K.paper, lsm: 1.2 });
-    txt(s, "株式会社カンツギ（事業計画）", { x: 0.4, y: 3.2, w: 3.0, h: 0.3, size: 11, color: K.paper });
-    txt(s, "勘継＝金継ぎのように現場の勘を継ぐ", { x: 0.4, y: 3.52, w: 3.0, h: 0.28, size: 9.5, color: K.paper });
-    const rx = 4.0, rw = 5.3;
-    txt(s, "事業計画書", { x: rx, y: 0.55, w: rw, h: 0.28, size: S.lead, color: K.gray700 });
-    txt(s, "人が減っても、\n現場が迷わず回る仕組みをつくる", { x: rx, y: 0.9, w: rw, h: 0.85, size: 22, bold: true, lsm: 1.2 });
-    txt(s, "普段のメガネと同じ軽さのAIグラスで熟練者の作業を記録し、報告を自動にし、次の担い手とAIの教材にする", { x: rx, y: 1.85, w: rw, h: 0.5, size: 11.5 });
-    box(s, { x: rx, y: 2.6, w: rw, h: 1.3, line: ACC, lw: 2, name: "first-step" });
-    txt(s, "最初の一歩", { x: rx + 0.2, y: 2.68, w: 2, h: 0.3, size: 12, bold: true, color: K.gray700 });
-    txt(s, "6か月で1拠点を動かす", { x: rx + 0.2, y: 2.98, w: rw - 0.4, h: 0.55, size: 26, bold: true, color: ACC, valign: "middle" });
-    txt(s, `3か月で試作品、3か月で実証。合格ラインは「1台1日${be}分の削減」`, { x: rx + 0.2, y: 3.52, w: rw - 0.4, h: 0.3, size: 10, color: K.gray700, valign: "middle" });
+    s.addImage({ data: logoColor, x: 0.45, y: 0.38, w: 1.9, h: 1.9 * 120 / 560 });
+    txt(s, "事業計画書（本編）", { x: 0.45, y: 0.9, w: 5.6, h: 0.26, size: 10.5, color: K.gray700 });
+    txt(s, "現場の勘を、次の担い手へ。", { x: 0.45, y: 1.16, w: 5.6, h: 0.6, size: 26, bold: true, color: K.ink, valign: "middle" });
+    txt(s, "人が減っても、現場が迷わず回る仕組みをつくる。AIグラスで熟練者の作業を記録し、書類づくりと若手の育成を自動化する", { x: 0.45, y: 1.8, w: 5.6, h: 0.5, size: 10.5 });
+    hline(s, 0.45, 2.42, 9.1, K.ink, 1.25);
+    box(s, { x: 0.45, y: 2.6, w: 5.6, h: 1.3, fill: TH.PALE, name: "first-step" });
+    txt(s, "最初の目標", { x: 0.65, y: 2.68, w: 2, h: 0.3, size: 11, bold: true, color: K.gray700 });
+    txt(s, "6か月で1拠点を動かす", { x: 0.65, y: 2.98, w: 5.2, h: 0.55, size: 24, bold: true, color: K.ink, valign: "middle" });
+    txt(s, `3か月で試作品、3か月で実証。合格ラインは「1台1日${be}分の削減」`, { x: 0.65, y: 3.52, w: 5.2, h: 0.3, size: 10, color: K.gray700, valign: "middle" });
+    txt(s, [run("社名：", { bold: true, color: K.ink }), run("カンツギ＝勘継。割れた器を金で継ぐ金継ぎのように、途切れそうな現場の勘をデータで継ぐ")], { x: 0.45, y: 4.1, w: 5.6, h: 0.5, size: 9.5, valign: "middle" });
+    // 地中送電ケーブル（CV）の断面：外側から シース・遮へい層・外部半導電層・絶縁体・内部半導電層・導体
+    const cx = 7.15, cy = 3.25, layers = [[0.66, "3A3F44"], [0.56, "8C6239"], [0.5, "2B2B2B"], [0.46, "F2F4F6"], [0.24, "2B2B2B"], [0.2, "B87333"]];
+    layers.forEach(([r, c]) => s.addShape("ellipse", { x: cx - r, y: cy - r, w: 2 * r, h: 2 * r, fill: { color: c }, line: { color: "2B2B2B", width: 0.5 } }));
+    [["シース", -0.42, -0.5], ["遮へい層", -0.53, -0.16], ["絶縁体", 0.3, 0.12], ["導体", 0.08, 0.38]].forEach(([n, dx, dy], i) => {
+      const ly = 2.7 + i * 0.36, ex = cx + dx, ey = cy + dy;
+      s.addShape("line", { x: Math.min(ex, 8.05), y: Math.min(ey, ly + 0.11), w: Math.abs(8.05 - ex), h: Math.abs(ly + 0.11 - ey), flipV: ly + 0.11 < ey && ex < 8.05 ? true : false, line: { color: K.gray700, width: 0.5 } });
+      txt(s, n, { x: 8.1, y: ly, w: 1.4, h: 0.22, size: 8.5, color: K.gray700, valign: "middle" });
+    });
+    txt(s, "地中送電ケーブル（CV）の断面", { x: 6.35, y: 4.0, w: 3.2, h: 0.22, size: 8, color: K.gray700, align: "center" });
+    box(s, { x: 6.6, y: 5.2, w: 3.28, h: 0.305, line: K.ink });
+    txt(s, [run("件名 ", { color: K.gray700 }), run("株式会社カンツギ 事業計画書", { bold: true, color: K.ink })], { x: 6.68, y: 5.2, w: 2.6, h: 0.305, size: 8, valign: "middle" });
+    txt(s, "1／33", { x: 9.3, y: 5.2, w: 0.58, h: 0.305, size: 9, bold: true, color: K.ink, align: "center", valign: "middle" });
+    s.addShape("line", { x: 9.3, y: 5.2, w: 0, h: 0.305, line: { color: K.ink, width: 0.75 } });
   }
 
   // ---------- Slide 設問との対応 ----------
@@ -231,17 +205,17 @@ async function main() {
       [{ text: "⑤", bold: true, color: ACC }, "各段階で想定される課題", "p.29〜33", "準備期は効果、導入期は売れるか、成長期は台数と人、成熟期は競合。最後に創業者の願い"]],
       { x: X0, y: 1.15, w: W, colW: [0.55, 2.55, 0.85, 5.25], rowH: 0.5, size: 9, align: "left", name: "toc" });
     box(s, { x: X0, y: 4.25, w: W, h: 0.62, fill: K.ink, name: "premise" });
-    txt(s, [run("課題の前提：", { bold: true, color: "E3A774" }), run("来年、人生の転機があり、豊富な資金をもとに新しい事業を立ち上げて経営する。", { breakLine: true }),
+    txt(s, [run("課題の前提：", { bold: true, color: L.YELLOW }), run("来年、人生の転機があり、豊富な資金をもとに新しい事業を立ち上げて経営する。", { breakLine: true }),
       run("資金は自己資金でまかなう（融資・出資は使わない）。数字はすべて一つの計算モデルから出している")], { x: X0 + 0.15, y: 4.25, w: W - 0.3, h: 0.62, size: 9.5, color: K.paper, valign: "middle" });
   }
 
   // ---------- Slide 2 ①事業概要 ----------
   {
     const s = add(3);
-    heading(s, chap("①", "事業概要 ─ 現場の作業を記録し、報告と教育を自動に"), "AIグラスを掛けて作業するだけ。報告書・図面との照合・教材までを一続きで届ける");
+    heading(s, chap("①", "事業概要 ─ 現場の作業を記録し、報告と教育を自動に"), "AIグラスを掛けて作業するだけ。報告書・図面との照合・教材までをまとめて届ける");
     const q = [
       ["何のビジネス？", "職長や施工管理者がAIグラスを掛けるだけで、一人称の動画と会話を記録。AIが工事写真を整理して報告書を作り、図面と照合し、教材にするサービス"],
-      ["既存の市場との違い", "施工管理アプリは人が撮って入力する器。当社は自動で記録し「照合→報告→教材」まで一続きで提供。施工経験者が中身を監修する"],
+      ["既存の市場との違い", "施工管理アプリは人が撮って入力する器。当社は自動で記録し「照合→報告→教材」までまとめて提供。施工経験者が中身を監修する"],
       ["誰のどんな悩みを解決する？", "関東の中堅電気工事会社。残業の上限規制と高齢化で、工事写真・報告書と若手の育成に回す時間がない。熟練者が辞めると判断が消える"],
       ["収益構造", "会社の基盤 月5万円＋端末1台 月2万円の利用料（標準10台で年300万円）が毎年積み上がる。初年度だけ導入支援200万円"],
     ];
@@ -273,7 +247,7 @@ async function main() {
       txt(s, items.map((v, j) => run("・" + v, { breakLine: j < items.length - 1 })), { x: x + 0.14, y: top + 0.65, w: cw - 0.28, h: ch - 0.75, size: 9.5, psa: 5 });
     });
     box(s, { x: X0, y: 3.45, w: W, h: 1.4, fill: K.ink, name: "omoi" });
-    txt(s, [run("想い", { bold: true, color: "E3A774", fontSize: 11, breakLine: true }),
+    txt(s, [run("想い", { bold: true, color: L.YELLOW, fontSize: 11, breakLine: true }),
       run("割れた器を金で継ぐ「金継ぎ」のように、途切れそうな現場の勘をデータで継ぐ。", { bold: true, fontSize: 14, breakLine: true }),
       run("人が減っても、日本の現場の品質を落とさない。若手が「聞ける先輩がいない」と迷わない現場をつくる。それが社名「カンツギ（勘継）」の意味", { fontSize: 10 })],
       { x: X0 + 0.2, y: 3.45, w: W - 0.4, h: 1.4, color: K.paper, valign: "middle", psa: 4 });
@@ -292,7 +266,7 @@ async function main() {
     cols.forEach(([h, fill, c, rows], i) => {
       const x = X0 + i * (cw + 0.55);
       box(s, { x, y: top, w: cw, h: 3.1, fill, name: "era-" + i });
-      txt(s, h, { x: x + 0.15, y: top + 0.1, w: cw - 0.3, h: 0.35, size: 14, bold: true, color: i === 1 ? "E3A774" : ACC });
+      txt(s, h, { x: x + 0.15, y: top + 0.1, w: cw - 0.3, h: 0.35, size: 14, bold: true, color: i === 1 ? L.YELLOW : ACC });
       rows.forEach(([k, v], j) => {
         const y = top + 0.55 + j * 0.62;
         txt(s, [run(k, { fontSize: 8.5, breakLine: true }), run(v, { bold: true, fontSize: 11 })], { x: x + 0.15, y, w: cw - 0.3, h: 0.58, color: c });
@@ -358,7 +332,7 @@ async function main() {
       const y = top + i * 1.05;
       box(s, { x: X0, y, w: lw, h: 0.95, fill: i === 0 ? K.ink : K.fill, name: "loss-" + i });
       const c = i === 0 ? K.paper : K.ink;
-      txt(s, n, { x: X0 + 0.15, y: y + 0.06, w: 2.55, h: 0.5, size: 17, bold: true, color: i === 0 ? "E3A774" : ACC, valign: "middle" });
+      txt(s, n, { x: X0 + 0.15, y: y + 0.06, w: 2.55, h: 0.5, size: 17, bold: true, color: i === 0 ? L.YELLOW : ACC, valign: "middle" });
       txt(s, a, { x: X0 + 2.7, y: y + 0.1, w: lw - 2.8, h: 0.42, size: 9.5, bold: true, color: c, valign: "middle" });
       txt(s, f, { x: X0 + 0.15, y: y + 0.58, w: lw - 0.3, h: 0.32, size: 8.5, color: i === 0 ? K.paper : K.gray700, valign: "middle" });
     });
@@ -376,10 +350,10 @@ async function main() {
     txt(s, "手戻り率2%は控えめな仮定（海外研究で工事費の0.4〜6%）。建設投資は国交省の見通し、完成工事高は施工統計の二次集計", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
 
-  // ---------- Slide 4 ③解決策・真似されにくい仕組み ----------
+  // ---------- Slide 4 ③解決策・他社がすぐに真似できない理由 ----------
   {
     const s = add(8);
-    heading(s, chap("①", "解決策 ─ 記録は自動。貯まるほど真似されにくい"), "一人称の動画と会話をAIが整理し、若手・管理者・次の担い手に渡す。その先にフィジカルAI");
+    heading(s, chap("①", "解決策 ─ 記録は自動。貯まるほど他社は真似しにくい"), "一人称の動画と会話をAIが整理し、若手・管理者・次の担い手に渡す。その先にフィジカルAI");
     s.addImage({ path: path.join(ASSETS, "shot-overview.png"), x: X0, y: 1.15, w: 5.6, h: 5.6 / 2.375 });
     txt(s, "サービス内容", { x: X0, y: 3.62, w: 5.6, h: 0.26, size: 10.5, bold: true });
     txt(s, [
@@ -389,7 +363,7 @@ async function main() {
     ], { x: X0, y: 3.9, w: 5.6, h: 0.95, size: 9.5, psa: 3 });
     const rx = 6.2, rw = 3.4;
     box(s, { x: rx, y: 1.15, w: rw, h: 3.7, fill: K.ink, name: "moat" });
-    txt(s, "真似されにくい3つの仕組み", { x: rx + 0.15, y: 1.22, w: rw - 0.3, h: 0.3, size: 11.5, bold: true, color: K.paper });
+    txt(s, "他社がすぐに真似できない3つの理由", { x: rx + 0.15, y: 1.22, w: rw - 0.3, h: 0.3, size: 11.5, bold: true, color: K.paper });
     [
       ["記録が貯まるほど強くなる", "図面に現れない現場処置の記録は使うほど増え、後発には移せない"],
       ["意味づけは現場経験者にしかできない", "映像のどこが重要かを見分けて意味を付けるのは、施工の経験者"],
@@ -405,13 +379,13 @@ async function main() {
   {
     const s = add(9);
     detailRef(s, DP.value);
-    heading(s, `① 導入効果 ─ 1拠点10台で年約${man(Math.round(CV.docs / 10) * 10)}万円。払う額の約${CV.ratio.toFixed(1)}倍`, "得をするのは、AIグラスを掛けた班だけ。確かな部分（書類と写真整理の時間）だけを計画に入れる");
+    heading(s, `① 導入効果 ─ 1拠点10台で年約${man(Math.round(CV.docs / 10) * 10)}万円。支払いの約${CV.ratio.toFixed(1)}倍`, "得をするのは、AIグラスを掛けた班だけ。確かな部分（書類と写真整理の時間）だけを計画に入れる");
     const top = 1.15, lw = 5.4;
     box(s, { x: X0, y: top, w: lw, h: 1.05, fill: K.fill });
     txt(s, [run("式：", { bold: true, color: ACC }), run(`10台 × 年240日 ×（職長15分×${man(Math.round(V.H.electrician * 100) * 100)}円 ＋ 施工管理者20分×${man(Math.round(V.H.manager * 100) * 100)}円）`, { breakLine: true }),
       run(`＝ 年 約${man(CV.docs)}万円`, { bold: true, fontSize: 18, color: ACC })], { x: X0 + 0.15, y: top, w: lw - 0.3, h: 1.05, size: 10, valign: "middle", psa: 3 });
     txt(s, `時給＝統計の年収×会社負担${V.WAGE.employerLoad}÷残業を含む年${man(V.WAGE.annualHours)}時間。1台1日35分は仮説で、実証で測る`, { x: X0, y: top + 1.1, w: lw, h: 0.28, size: 8, color: K.gray700 });
-    const bars = [["お客様の得（書類）", CV.docs, ACC], ["お客様が払う額", CV.cost, K.ink], ["手戻りも減れば（上振れ）", CV.docs + CV.rework, K.gray500]];
+    const bars = [["お客様の効果（書類）", CV.docs, ACC], ["お客様の支払い", CV.cost, K.ink], ["手戻りも減れば（上振れ）", CV.docs + CV.rework, K.gray500]];
     const sc = (lw - 2.95) / (CV.docs + CV.rework);
     bars.forEach(([n, v, c], i) => {
       const y = top + 1.5 + i * 0.5;
@@ -419,10 +393,10 @@ async function main() {
       box(s, { x: X0 + 1.95, y: y + 0.06, w: v * sc, h: 0.26, fill: c });
       txt(s, man(v) + "万円", { x: X0 + 2.0 + v * sc, y, w: 0.95, h: 0.38, size: 10, bold: true, valign: "middle" });
     });
-    txt(s, `払う額＝当社への利用料300万円＋グラスのリース約${man(V.leaseSite())}万円`, { x: X0, y: top + 3.0, w: lw, h: 0.25, size: 8, color: K.gray700 });
+    txt(s, `支払い＝当社への利用料300万円＋グラスのリース約${man(V.leaseSite())}万円`, { x: X0, y: top + 3.0, w: lw, h: 0.25, size: 8, color: K.gray700 });
     const rx = 6.1, rw = 3.5;
     box(s, { x: rx, y: top, w: rw, h: 1.5, fill: K.ink });
-    txt(s, [run("元が取れる条件", { bold: true, color: "E3A774", breakLine: true }), run(`1台1日 ${Math.round(CV.breakEvenMin)}分`, { bold: true, fontSize: 20, breakLine: true }), run("想定は35分。実証の合格ラインにする", { fontSize: 9 })], { x: rx + 0.15, y: top, w: rw - 0.3, h: 1.5, size: 10, color: K.paper, valign: "middle", psa: 3 });
+    txt(s, [run("元が取れる条件", { bold: true, color: L.YELLOW, breakLine: true }), run(`1台1日 ${Math.round(CV.breakEvenMin)}分`, { bold: true, fontSize: 20, breakLine: true }), run("想定は35分。実証の合格ラインにする", { fontSize: 9 })], { x: rx + 0.15, y: top, w: rw - 0.3, h: 1.5, size: 10, color: K.paper, valign: "middle", psa: 3 });
     box(s, { x: rx, y: top + 1.62, w: rw, h: 1.63, fill: K.fill });
     txt(s, [run("計画に入れない2つ", { bold: true, breakLine: true }), run(`手戻り：年${man(CV.rework)}万円（30億円×2%×対象工種30%×削減20%）。実測できれば約${CV.ratioUp.toFixed(1)}倍`, { fontSize: 9, breakLine: true }),
       run("新人の指導：金額にせず、独り立ちまでの月数で測る", { fontSize: 9 })], { x: rx + 0.15, y: top + 1.62, w: rw - 0.3, h: 1.63, size: 10, valign: "middle", psa: 4 });
@@ -450,10 +424,10 @@ async function main() {
     // red / blue: mistake-prone point
     const ry = top + 2.18;
     box(s, { x: X0, y: ry, w: lw, h: 0.92, line: K.ink, lw: 1.25, name: "red-blue" });
-    s.addShape("line", { x: X0 + 0.2, y: ry + 0.25, w: 1.0, h: 0, line: { color: "C0392B", width: 4 } });
-    s.addShape("line", { x: X0 + 0.2, y: ry + 0.45, w: 1.0, h: 0, line: { color: "2E5C9A", width: 4 } });
+    s.addShape("line", { x: X0 + 0.2, y: ry + 0.25, w: 1.0, h: 0, line: { color: L.RED, width: 4 } });
+    s.addShape("line", { x: X0 + 0.2, y: ry + 0.45, w: 1.0, h: 0, line: { color: "2F6DB5", width: 4 } });
     txt(s, "✂", { x: X0 + 1.22, y: ry + 0.12, w: 0.3, h: 0.3, size: 14, color: K.ink });
-    txt(s, "赤を切れ", { x: X0 + 0.2, y: ry + 0.56, w: 1.3, h: 0.3, size: 10, bold: true, color: "C0392B" });
+    txt(s, "赤を切れ", { x: X0 + 0.2, y: ry + 0.56, w: 1.3, h: 0.3, size: 10, bold: true, color: L.RED });
     txt(s, [run("ミスしやすい所で止める", { bold: true, breakLine: true }), run("過去のミス事例を学習させ、現物を認識したら音声で警告し、レーザーポインターで正しい位置を示す（赤か青か、の瞬間を外さない）", { fontSize: 8.5 })], { x: X0 + 1.6, y: ry + 0.04, w: lw - 1.7, h: 0.84, size: 9.5, valign: "middle" });
     // benefits
     const rx = 4.95, rw = 4.65;
@@ -472,8 +446,8 @@ async function main() {
     });
     box(s, { x: X0, y: 4.28, w: W, h: 0.62, fill: K.ink });
     txt(s, [
-      run("副次効果：", { bold: true, color: "E3A774" }), run("異物・溶接の火花から目を守る（保護めがねの規格適合は要確認）　", {}),
-      run("限界：", { bold: true, color: "E3A774" }), run("位置合わせには数mm〜cmのずれ。寸法の最終確認はスケールで。役割は「測る道具」でなく「理解して間違いに気づく道具」"),
+      run("副次効果：", { bold: true, color: L.YELLOW }), run("異物・溶接の火花から目を守る（保護めがねの規格適合は要確認）　", {}),
+      run("限界：", { bold: true, color: L.YELLOW }), run("位置合わせには数mm〜cmのずれ。寸法の最終確認はスケールで。役割は「測る道具」でなく「理解して間違いに気づく道具」"),
     ], { x: X0 + 0.15, y: 4.28, w: W - 0.3, h: 0.62, size: 8.5, color: K.paper, valign: "middle" });
     txt(s, "効果の測り方：手戻り・施工ミスの件数、1ジョイントの作業時間、新人が独り立ちするまでの期間。まずよく使うジョイント1種類で実証する", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
@@ -485,7 +459,7 @@ async function main() {
     const cx = 2.65, cy = 2.8, RX = 1.6, RY = 1.2;
     s.addShape("ellipse", { x: cx - RX, y: cy - RY, w: 2 * RX, h: 2 * RY, fill: { color: K.paper }, line: { color: K.rule, width: 1.5, dashType: "dash" } });
     box(s, { x: cx - 0.68, y: cy - 0.38, w: 1.36, h: 0.76, fill: K.ink });
-    txt(s, [run("現場を解釈できるAI", { bold: true, breakLine: true }), run("＝データ資産", { color: "E3A774", bold: true })], { x: cx - 0.68, y: cy - 0.38, w: 1.36, h: 0.76, size: 9, color: K.paper, align: "center", valign: "middle" });
+    txt(s, [run("現場を解釈できるAI", { bold: true, breakLine: true }), run("＝データ資産", { color: L.YELLOW, bold: true })], { x: cx - 0.68, y: cy - 0.38, w: 1.36, h: 0.76, size: 9, color: K.paper, align: "center", valign: "middle" });
     const nodes = [["撮る", "一人称で常時記録"], ["教える", "ベテランが口頭で\n「この場面が大事」"], ["切り取る", "AIが必要な場面を\n抜き出して報告"], ["集める", "意味のあるデータに\n絞って収集"], ["広げる", "別の作業・現場へ"]];
     nodes.forEach(([h, d], i) => {
       const ang = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
@@ -507,7 +481,7 @@ async function main() {
       txt(s, [run(h, { bold: true, breakLine: true }), run(d, { fontSize: 8.5, color: K.gray700 })], { x: rx, y: y + 0.02, w: rw, h: 0.48, size: 9.5 });
     });
     box(s, { x: X0, y: 4.35, w: W, h: 0.58, fill: K.ink });
-    txt(s, [run("暗黙知が形式知へ：", { bold: true, color: "E3A774" }), run("情報を、楽に・大量に・抜け目なく・再現性をもって・正確に・速く伝える。人が抜けても、解釈できるAIが残る")], { x: X0 + 0.15, y: 4.35, w: W - 0.3, h: 0.58, size: 10, color: K.paper, valign: "middle" });
+    txt(s, [run("暗黙知が形式知へ：", { bold: true, color: L.YELLOW }), run("情報を、楽に・大量に・抜け目なく・再現性をもって・正確に・速く伝える。人が抜けても、解釈できるAIが残る")], { x: X0 + 0.15, y: 4.35, w: W - 0.3, h: 0.58, size: 10, color: K.paper, valign: "middle" });
     txt(s, "「教える」はベテランの管理者の口頭指示と、場面へのタグ付け。真似されにくさの源泉（意味づけは施工経験者にしかできない）", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
 
@@ -630,7 +604,7 @@ async function main() {
     box(s, { x: X0, y: top, w: lw, h: ih + 0.06, line: K.rule });
     s.addImage({ path: path.join(ASSETS, "ref-hitachi-ai-safety.png"), x: X0 + 0.03, y: top + 0.03, w: lw - 0.06, h: ih });
     txt(s, "引用：日立製作所・日立ビルシステム・日立パワーソリューションズ ニュースリリース（2025年10月10日）「AI Safetyソリューションのイメージ図」", { x: X0, y: top + ih + 0.1, w: lw, h: 0.32, size: 7.5, color: K.gray500 });
-    txt(s, [run("日立の強み（正直に）：", { bold: true, color: ACC, breakLine: true }), run("NVIDIAと組んだ映像AI（VLM）、日立ビルシステムの全国の現場で数千人が運用（2025年11月〜）、ブランドと保守網。技術と規模では勝てない", { fontSize: 8.5 })],
+    txt(s, [run("日立の強み：", { bold: true, color: ACC, breakLine: true }), run("NVIDIAと組んだ映像AI（VLM）、日立ビルシステムの全国の現場で数千人が運用（2025年11月〜）、ブランドと保守網。技術と規模では勝てない", { fontSize: 8.5 })],
       { x: X0, y: top + ih + 0.45, w: lw, h: 0.85, size: 9, psa: 2 });
     const rx = 5.05, rw = 4.55;
     table(s, [["", "日立 AI Safety", "日立PS 点検AI", "カンツギ"],
@@ -643,8 +617,8 @@ async function main() {
       ["端末", "ウェアラブル＋スマホ", "写真（カメラ）", { text: "普段使いのAIグラス", bold: true }]],
       { x: rx, y: top, w: rw, colW: [0.7, 1.25, 1.3, 1.3], rowH: 0.34, size: 7.5, leftCols: [1, 2, 3], align: "left", name: "vs-hitachi" });
     box(s, { x: X0, y: 4.0, w: W, h: 0.88, fill: K.ink, name: "diff-strategy" });
-    txt(s, [run("差別化戦略：", { bold: true, color: "E3A774" }), run("①安全と保守では競わない（日立の土俵）　②施工の書類（写真台帳・検査記録）を発注者の書式で出す　③電気工事の工種の型と教材を業界共通で先に揃える", { breakLine: true }),
-      run("もし日立が施工・中堅向けに来たら：", { bold: true, color: "E3A774" }), run("競わず提携も選ぶ（日立の基盤に電気工事の型を載せる・協力会社へ広げる）。勝負の窓は2〜3年と見て、型とデータを先に貯める")],
+    txt(s, [run("差別化戦略：", { bold: true, color: L.YELLOW }), run("①安全と保守では競わない（日立の領域）　②施工の書類（写真台帳・検査記録）を発注者の書式で出す　③電気工事の工種の型と教材を業界共通で先に揃える", { breakLine: true }),
+      run("もし日立が施工・中堅向けに来たら：", { bold: true, color: L.YELLOW }), run("競わず提携も選ぶ（日立の基盤に電気工事の型を載せる・協力会社へ広げる）。2〜3年で型とデータを先に揃える")],
       { x: X0 + 0.15, y: 4.0, w: W - 0.3, h: 0.88, size: 8.5, color: K.paper, valign: "middle", psa: 2 });
     txt(s, "出典：日立ニュースリリース（2025年3月・10月・11月）、日立 Physical AI 事例（2026年7月）、BUILT・ITmedia。日立の価格・外販の予定は未確認", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
@@ -662,7 +636,7 @@ async function main() {
       run("Python・Power BI・FastAPI・Docker・LangChain・RAG を独学し業務に実装", { breakLine: true }),
       run("ニュース要約→音声合成→毎朝配信の仕組みを個人で構築・運用中", { breakLine: true }),
       run("1級電気工事施工管理技士・G検定・大学院修了", { breakLine: true }),
-      run("私の役割：最初の営業・現場監修の統括・理念と判断の基準づくり", { bold: true, color: "E3A774" }),
+      run("私の役割：最初の営業・現場監修の統括・理念と判断の基準づくり", { bold: true, color: L.YELLOW }),
     ], { x: lx + 0.15, y: top + 0.78, w: lw - 0.3, h: 2.85, size: 9.5, color: K.paper, psa: 6 });
     const rx = 3.95, rw = 5.65;
     txt(s, "チームと外部の体制", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
@@ -682,11 +656,11 @@ async function main() {
     heading(s, chap("③", "経営理念 ─ 現場の勘を、次の担い手へ。"), "ホームページで多くの人に伝える内容：使命 → 大切にすること → 一人ひとりへの約束");
     const top = 1.15, lw = 3.6;
     box(s, { x: X0, y: top, w: lw, h: 3.72, fill: K.ink, name: "mission" });
-    txt(s, [run("使命（ミッション）", { bold: true, color: "E3A774", fontSize: 10, breakLine: true }),
+    txt(s, [run("使命（ミッション）", { bold: true, color: L.YELLOW, fontSize: 10, breakLine: true }),
       run("現場の勘を、", { bold: true, fontSize: 20, breakLine: true }), run("次の担い手へ。", { bold: true, fontSize: 20, breakLine: true }),
       run("熟練者の判断をデータで継ぎ、人が減っても日本の現場の品質を守る", { fontSize: 10.5, breakLine: true }),
       run(" ", { fontSize: 6, breakLine: true }),
-      run("目指す姿（ビジョン）", { bold: true, color: "E3A774", fontSize: 10, breakLine: true }),
+      run("目指す姿（ビジョン）", { bold: true, color: L.YELLOW, fontSize: 10, breakLine: true }),
       run("人が減っても、現場が迷わず回る。若手が「聞ける先輩がいない」と困らない", { fontSize: 10.5 })],
       { x: X0 + 0.2, y: top + 0.1, w: lw - 0.4, h: 3.52, color: K.paper, valign: "middle", psa: 3 });
     const rx = X0 + lw + 0.25, rw = W - lw - 0.25;
@@ -722,7 +696,7 @@ async function main() {
     txt(s, "ターゲット市場の数え方（顧客数×年額、億円）", { x: rx, y: 1.15, w: rw, h: 0.26, size: 10.5, bold: true });
     table(s, [
       ["業種＼規模", "大（300人以上）", "中（30〜299人）", "小（30人未満）"],
-      ["電気工事", "300社×1,500万＝45", { text: "2,100社×300万＝63", bold: true, fill: "F6E7DA" }, { text: "対象外", color: K.gray500 }],
+      ["電気工事", "300社×1,500万＝45", { text: "2,100社×300万＝63", bold: true, fill: L.PALEY }, { text: "対象外", color: K.gray500 }],
       ["電気通信工事", "100社×1,500万＝15", "600社×300万＝18", { text: "対象外", color: K.gray500 }],
       [{ text: "電線・素材工場", color: K.gray700 }, { text: "隣接市場（成長期以降）", color: K.gray700 }, { text: "", color: K.gray700 }, { text: "", color: K.gray700 }],
     ], { x: rx, y: 1.45, w: rw, colW: [1.1, 1.3, 1.4, 1.1], rowH: 0.34, size: 8, align: "center", name: "segments" });
@@ -760,7 +734,7 @@ async function main() {
     ], { x: X0, y: top + 2.0, w: 5.3, h: 0.95, size: 9, psa: 3 });
     const rx = 6.0, rw = 3.6;
     box(s, { x: rx, y: top, w: rw, h: 1.5, fill: K.ink, name: "icp" });
-    txt(s, [run("理想の顧客像", { bold: true, color: "E3A774", breakLine: true }),
+    txt(s, [run("理想の顧客像", { bold: true, color: L.YELLOW, breakLine: true }),
       run("関東の電気工事会社", { bold: true, breakLine: true }),
       run("施工管理者30人以上・電力や公共工事が多く書類が多い・残業規制で人を増やせない")], { x: rx + 0.15, y: top + 0.05, w: rw - 0.3, h: 1.4, size: 9.5, color: K.paper, valign: "middle", psa: 3 });
     txt(s, "意思決定に関わる3人", { x: rx, y: top + 1.62, w: rw, h: 0.26, size: 10.5, bold: true });
@@ -851,10 +825,10 @@ async function main() {
       catAxisLabelFontFace: "+mn-lt", valAxisLabelFontFace: "+mn-lt", valGridLine: { color: K.rule, size: 0.5 }, catGridLine: { style: "none" },
       valAxisMinVal: 0, valAxisMaxVal: 1000, valAxisMajorUnit: 200, catAxisLineShow: true, valAxisLineShow: false, showLegend: false };
     s.addChart([
-      { type: pres.charts.LINE, data: [{ name: "得の累計", labels: months, values: gain }], options: { chartColors: [ACC], lineSize: 3, lineDataSymbol: "none" } },
+      { type: pres.charts.LINE, data: [{ name: "効果の累計", labels: months, values: gain }], options: { chartColors: [ACC], lineSize: 3, lineDataSymbol: "none" } },
       { type: pres.charts.LINE, data: [{ name: "払った額の累計", labels: months, values: cost }], options: { chartColors: [K.ink], lineSize: 2, lineDash: "dash", lineDataSymbol: "none" } },
     ], { x: rx, y: top + 0.28, w: rw, h: 2.5, ...axis, objectName: "roi-chart" });
-    txt(s, [run("━ 得の累計", { bold: true, color: ACC }), run("　┅ 払った額の累計（横軸は月）", { color: K.gray700 })], { x: rx + 0.5, y: top + 0.32, w: 3.5, h: 0.22, size: 8.5 });
+    txt(s, [run("━ 効果の累計", { bold: true, color: ACC }), run("　┅ 支払いの累計（横軸は月）", { color: K.gray700 })], { x: rx + 0.5, y: top + 0.32, w: 3.5, h: 0.22, size: 8.5 });
     txt(s, `初年度 約${man(firstYear)}万円（利用料300＋導入支援200＋リース${man(V.leaseSite())}）÷ 月約${man(CV.docs / 12)}万円 ＝ 約${Math.round(firstYear / (CV.docs / 12))}か月で回収。2年目からは毎年 得${man(CV.docs)}万円／払う${man(CV.cost)}万円`, { x: rx, y: top + 2.82, w: rw, h: 0.5, size: 8.5, bold: true });
     txt(s, `月約${man(CV.docs / 12)}万円＝10台×20日×（職長15分＋施工管理者20分）。手戻りも実測できれば約${Math.round(firstYear / ((CV.docs + CV.rework) / 12))}か月で回収`, { x: rx, y: top + 3.35, w: rw, h: 0.4, size: S.note, color: K.gray700 });
   }
@@ -890,7 +864,7 @@ async function main() {
       if (i < 3) arrow(s, x + 1.95, 3.88, 0.25, 0, { lw: 2 });
     });
     box(s, { x: X0, y: 4.3, w: W, h: 0.55, fill: K.ink });
-    txt(s, [run("最初の10社：", { bold: true, color: "E3A774" }), run("準備期に有償試験3社 → 1年目に本契約3社＋試験導入 → 2年目に累計12拠点。商談期間は4〜6か月を見込む")], { x: X0 + 0.15, y: 4.3, w: W - 0.3, h: 0.55, size: 9.5, color: K.paper, valign: "middle" });
+    txt(s, [run("最初の10社：", { bold: true, color: L.YELLOW }), run("準備期に有償試験3社 → 1年目に本契約3社＋試験導入 → 2年目に累計12拠点。商談期間は4〜6か月を見込む")], { x: X0 + 0.15, y: 4.3, w: W - 0.3, h: 0.55, size: 9.5, color: K.paper, valign: "middle" });
     txt(s, "4つの条件：施工管理者30人以上・電力や官公庁の工事が多い・手戻りが高くつく工種がある・デジタル化の素地。率はすべて仮定で、最初の3社で実測する", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
 
@@ -1018,7 +992,7 @@ async function main() {
   {
     const s = add(26);
     detailRef(s, DP.gates);
-    heading(s, chap("④", "黒字化の条件 ─ 鍵は拠点数より、1拠点の台数"), "10台のままでは計画どおりでも5年で黒字にならない。15台に増やせれば新規が計画の6割でも5年目に黒字");
+    heading(s, chap("④", "黒字化の条件 ─ 拠点数より、1拠点の台数"), "10台のままでは計画どおりでも5年で黒字にならない。15台に増やせれば新規が計画の6割でも5年目に黒字");
     L.gates(s, V);
     txt(s, "新規拠点・個社設定を同じ割合で減らし、社員数＝4＋（計画−4）×達成度で採用も遅らせた簡易計算。15台はAIグラス12台＋表示付き3台", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
@@ -1034,13 +1008,13 @@ async function main() {
       ["期末の拠点", "─", ...P((r) => String(r.sites))],
       ["社員", "1", ...P((r) => String(r.staff))],
       ["売上（百万円）", "─", ...P((r) => String(mil(r.sales)))],
-      ["営業損益（百万円）", "▲5", ...P((r) => ({ text: (r.op < 0 ? "▲" : "") + Math.abs(mil(r.op)), color: r.op < 0 ? ACC : K.ink, bold: true }))],
+      ["営業損益（百万円）", "▲5", ...P((r) => ({ text: (r.op < 0 ? "▲" : "") + Math.abs(mil(r.op)), color: r.op < 0 ? L.RED : K.ink, bold: true }))],
       ["期末の現金（百万円）", "─", ...P((r) => String(mil(r.cash)))],
       ["進む条件（判定の線）", `1台1日${be}分以上`, "2社以上が本契約", "平均12台", "継続率90%→追加資金", "─", "─"]],
       { x: X0, y: 1.12, w: W, colW: [1.5, 1.2, 1.3, 1.3, 1.3, 1.3, 1.3], rowH: [0.3, 0.62, 0.28, 0.28, 0.28, 0.28, 0.28, 0.4], size: 8.5, align: "center", leftCols: [0], strongRows: [5], name: "yearly" });
     box(s, { x: X0, y: 4.1, w: W, h: 0.78, fill: K.ink, name: "yearly-msg" });
-    txt(s, [run("5年間は赤字。", { bold: true, color: "E3A774" }), run(`5年目は売上約${mil(Y5.sales)}百万円・営業損益▲${mil(-Y5.op)}百万円で、あと約${gapSites}拠点分の粗利が足りない。`, { breakLine: true }),
-      run("黒字化の条件：", { bold: true, color: "E3A774" }), run(`効果が出た班から台数を増やし、1拠点15台にすると5年目に黒字（営業利益約${mil(D15.y5.op)}百万円・p.26）`)],
+    txt(s, [run("5年間は赤字。", { bold: true, color: L.YELLOW }), run(`5年目は売上約${mil(Y5.sales)}百万円・営業損益▲${mil(-Y5.op)}百万円で、あと約${gapSites}拠点分の粗利が足りない。`, { breakLine: true }),
+      run("黒字化の条件：", { bold: true, color: L.YELLOW }), run(`効果が出た班から台数を増やし、1拠点15台にすると5年目に黒字（営業利益約${mil(D15.y5.op)}百万円・p.26）`)],
       { x: X0 + 0.15, y: 4.1, w: W - 0.3, h: 0.78, size: 9.5, color: K.paper, valign: "middle", psa: 2 });
     txt(s, "準備期の営業損益は準備費用500万円。1年目の3拠点は有償の試験導入（利用料なし）。簡易計算（税・償却・運転資本を除く）", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
@@ -1070,12 +1044,12 @@ async function main() {
     txt(s, "前提を崩しても10年で黒字になるか", { x: rx, y: top, w: rw, h: 0.26, size: 10, bold: true });
     const yr = (v) => (v ? v + "年目" : "─");
     table(s, [["10年で", "黒字", "赤字を回収", "最低現金"],
-      ...TEN.map((c, i) => [{ text: c.n, bold: i === 0 }, yr(c.fb), { text: yr(c.cb), color: c.cb ? K.ink : ACC, bold: !c.cb }, { text: String(mil(c.min)), color: c.min < 0 ? ACC : K.ink, bold: c.min < 0 }])],
+      ...TEN.map((c, i) => [{ text: c.n, bold: i === 0 }, yr(c.fb), { text: yr(c.cb), color: c.cb ? L.GREEN : L.RED, bold: true }, { text: String(mil(c.min)), color: c.min < 0 ? L.RED : K.ink, bold: c.min < 0 }])],
       { x: rx, y: top + 0.3, w: rw, colW: [1.35, 0.7, 0.9, 0.8], rowH: 0.27, size: 8, align: "center", leftCols: [0], strongRows: [1], name: "ten-stress" });
     box(s, { x: rx, y: top + 2.32, w: rw, h: 1.48, fill: K.ink });
-    txt(s, [run("読み方", { bold: true, color: "E3A774", breakLine: true }),
+    txt(s, [run("ポイント", { bold: true, color: L.YELLOW, breakLine: true }),
       run(`5年で見ると赤字だが、積み上げ型なので6年目から黒字が厚くなる。10年目の営業利益は約${mil(R10.rows[9].op)}百万円（15台なら約${mil(R10_15.rows[9].op)}百万円）。`, { breakLine: true }),
-      run("値下げとAI費用2倍では現金がいったんマイナスになり、自己資金の追加が要る", { color: "E3A774" })], { x: rx + 0.12, y: top + 2.34, w: rw - 0.24, h: 1.44, size: 8.5, color: K.paper, valign: "middle", psa: 3 });
+      run("値下げとAI費用2倍では現金がいったんマイナスになり、自己資金の追加が要る", { color: L.YELLOW })], { x: rx + 0.12, y: top + 2.34, w: rw - 0.24, h: 1.44, size: 8.5, color: K.paper, valign: "middle", psa: 3 });
     txt(s, `6〜10年目の前提：新規 年36→40拠点（関東の中堅で頭打ち）、社員24→32人、解約は年10%。電線工場・海外は入れていない。10年目でターゲット市場の約${(R10.rows[9].sites * 300 / 141e2).toFixed(1)}%`, { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
 
@@ -1113,7 +1087,7 @@ async function main() {
       ["1", "普段使いのグラスの性能", "一般向けAIグラスは動画1回3分程度まで（報道）。開発者向けの映像は720p・30fps。連続で撮ると電池が持たない", "要所の短い記録に絞る。準備期に実機を1日使って測る"],
       ["2", "現場の安全", "保護めがねの規格に合うカメラ付きグラスは少ない。落下・粉じんに弱い", "安全担当と確認。粉じん・高所は産業用（RealWear等）を選べる設計"],
       ["3", "データの通り道", "一般向けグラスはメーカーのアプリを経由する。図面・顧客情報の扱い", "規約と設定を確認。当社アプリ経由・国内保存に限る"],
-      ["4", "値段", `年300万円は未検証。得は払う額の約${CV.ratio.toFixed(1)}倍で余裕が小さい。試験導入で導入支援200万円も重い`, "試験導入3社に価格を聞く。写真台帳の自動化で削減分を上げる"],
+      ["4", "値段", `年300万円は未検証。効果は支払いの約${CV.ratio.toFixed(1)}倍で余裕が小さい。試験導入で導入支援200万円も重い`, "試験導入3社に価格を聞く。写真台帳の自動化で削減分を上げる"],
       ["5", "黒字化", "1拠点10台のままでは5年で黒字にならない", "2年目末に平均12台を判定の線にする"],
       ["6", "人", `CTO（年収1,000万円）・コンサル${V.ROLES.find((r) => r[0] === "導入コンサルタント")[2][4]}人・ラベル付けの監修を採れるか`, "採用を拠点数に連動。顧問・大学と組む"],
       ["7", "獲得費用（CAC）", "1〜2年目の私の営業の時間をCACに入れていない", "入れると上がる。実績で更新して見せる"],
@@ -1161,7 +1135,7 @@ async function main() {
     const s = add(32);
     heading(s, chap("⑤", "リスク ─ 最大のリスクは自分。役割と判断基準を先に決める"), "弱みは隠さない。対策とセットで示す");
     const risks = [
-      ["創業者が律速になる", "役割を「型を渡す」に絞る。BSCの4指標で判断を任せ、1か月不在でも回る会社にする"],
+      ["創業者がボトルネックになる", "役割を「型を渡す」に絞る。BSCの4指標で判断を任せ、1か月不在でも回る会社にする"],
       ["前職との関係", "前職の顧客・機密は使わない。退職時の合意（競業・守秘）を確認し、紹介は第三者経由で"],
       ["競合のAI化", "施工管理アプリ・RealWear等とは競わずにつなぐ。判断の蓄積と施工経験者の監修を障壁にする"],
       ["常時収録への抵抗", "作業時間・作業エリアに限定。本人同意と労使合意、休憩中・私語は自動除外"],
@@ -1182,7 +1156,7 @@ async function main() {
   // ---------- Slide 最後に（創業者の願い） ----------
   {
     const s = add(33);
-    heading(s, "最後に ─ 儲けより、残したいもの", "黒字は目的ではなく、続けるための条件。社会の役に立つ事業として、見返りを求めずに始める");
+    heading(s, "最後に ─ 事業への思い", "黒字は目的ではなく、続けるための条件。社会の役に立つ事業として、見返りを求めずに始める");
     const top = 1.12, lw = 3.6;
     box(s, { x: X0, y: top, w: lw, h: 2.75, fill: K.fill, name: "impact" });
     txt(s, "10年で現場に残るもの（計算）", { x: X0 + 0.15, y: top + 0.08, w: lw - 0.3, h: 0.26, size: 10.5, bold: true });
@@ -1206,8 +1180,9 @@ async function main() {
     });
     box(s, { x: X0, y: 4.0, w: W, h: 0.88, fill: K.ink, name: "wish" });
     txt(s, [run("日本の品質を支えてきた現場の勘を、人に依存しない形で次の担い手へ。", { bold: true, fontSize: 14, breakLine: true }),
-      run("私の資金と時間は、そのための種です。最初の一歩として、6か月で最初の1拠点を動かします。", { fontSize: 11 })],
+      run("私の資金と時間は、そのために使います。最初の目標は、6か月で最初の1拠点を動かすことです。", { fontSize: 11 })],
       { x: X0 + 0.2, y: 4.0, w: W - 0.4, h: 0.88, color: K.paper, valign: "middle", psa: 3 });
+    txt(s, "ご清聴ありがとうございました", { x: 3.85, y: 5.21, w: 2.65, h: 0.28, size: 10.5, bold: true, color: K.ink, align: "right", valign: "middle" });
     txt(s, "時間と価値は10年計画（10台）の拠点数×1拠点の削減（年1,400時間・約500万円）から。仮説の削減時間（1台1日35分）が前提で、実証で測る", { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
   }
 

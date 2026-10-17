@@ -1,0 +1,38 @@
+# kantsugi の事業計画から作った記事の企画（2026-10-17）
+topics:
+  - topic: "事業計画の数字に根拠を持たせる"
+    angle: "事業計画の数字を作って分かった、根拠の出し方4つ"
+    article_type: A
+    material: materials/kantsugi-numbers.md
+    status: idea
+    publish_check: "匿名性・研修の提出時期・他社名の出典を確かめてから公開"
+  - topic: "赤字の計画をそのまま出す"
+    angle: "5年で黒字にならない計画を、そのまま出した理由"
+    article_type: A
+    material: materials/kantsugi-honest-red.md
+    status: idea
+    publish_check: "匿名性・研修の提出時期・他社名の出典を確かめてから公開"
+  - topic: "事業計画の前提の仕分け"
+    angle: "事業計画の前提を全部並べる：統計・公表・見積・仮説の4つで仕分けた（11項目）"
+    article_type: B
+    material: materials/kantsugi-assumptions.md
+    status: idea
+    publish_check: "匿名性・研修の提出時期・他社名の出典を確かめてから公開"
+  - topic: "大手と同じ方向の事業の考え方"
+    angle: "大手が同じ方向の事業をしていると分かったときに、最初にやった3つのこと"
+    article_type: A
+    material: materials/kantsugi-big-competitor.md
+    status: idea
+    publish_check: "匿名性・研修の提出時期・他社名の出典を確かめてから公開"
+  - topic: "計画の弱いところを先に言う"
+    angle: "自分の事業計画の弱いところを4つ、先に書き出した"
+    article_type: A
+    material: materials/kantsugi-weak-points.md
+    status: idea
+    publish_check: "匿名性・研修の提出時期・他社名の出典を確かめてから公開"
+  - topic: "事業計画を資料にするまで"
+    angle: "研修の事業計画を、10分・16枚・A4用紙2枚にまとめるまで"
+    article_type: D
+    material: materials/kantsugi-making.md
+    status: idea
+    publish_check: "匿名性・研修の提出時期・他社名の出典を確かめてから公開"
