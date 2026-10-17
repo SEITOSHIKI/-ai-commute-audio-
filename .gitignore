@@ -3,3 +3,6 @@ __pycache__/
 output/
 .venv/
 .env
+
+# 個別株戦略スキルの個人データ
+.claude/skills/stock-strategy/references/portfolio.local.md
