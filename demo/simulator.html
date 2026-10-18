@@ -1,0 +1,477 @@
+<title>カンツギ導入効果シミュレーター</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap">
+<style>
+/* Layout: 図面の外枠の中に「条件」と「結果」の2欄。下に式と前提、右下に表題欄（16枚版の事業計画書と同じ書き方） */
+:root {
+  --ground: #EEF2F6;   /* 図面の外 */
+  --paper: #FFFFFF;    /* 図面 */
+  --ink: #1F2933;      /* 本文 */
+  --navy: #1B365D;     /* 枠・見出し */
+  --blue: #2F6DB5;     /* 強調の数字 */
+  --pale: #EAF0F6;     /* 薄い面 */
+  --line: #B8C4D0;     /* 罫線 */
+  --muted: #4A5563;    /* 補足 */
+  --faint: #7B8794;    /* 注記 */
+  --head-bg: #1B365D;  /* 表の見出し行 */
+  --head-fg: #FFFFFF;
+  --go: #2E7D32;       /* 進む */
+  --warn: #F5C400;     /* 注意 */
+  --warn-fill: #FFF4C2;
+  --stop: #C62828;     /* 止まる・赤字 */
+  --kin: #B8692E;      /* ロゴの金継ぎの線 */
+  --font: "BIZ UDPGothic", "Meiryo", "Hiragino Sans", "Yu Gothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #08121F; --paper: #0F1B2D; --ink: #E3E9F1; --navy: #A9C3E6; --blue: #78AEF0; --pale: #172A42;
+    --line: #34485F; --muted: #AEBACA; --faint: #8492A6; --head-bg: #24456F; --head-fg: #FFFFFF;
+    --go: #66C26B; --warn: #F5C400; --warn-fill: #3B3412; --stop: #F07575; --kin: #D9925A; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #08121F; --paper: #0F1B2D; --ink: #E3E9F1; --navy: #A9C3E6; --blue: #78AEF0; --pale: #172A42;
+  --line: #34485F; --muted: #AEBACA; --faint: #8492A6; --head-bg: #24456F; --head-fg: #FFFFFF;
+  --go: #66C26B; --warn: #F5C400; --warn-fill: #3B3412; --stop: #F07575; --kin: #D9925A; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--ground); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px;
+}
+.sheet {
+  max-width: 1120px; margin: 0 auto; background: var(--paper); border: 1.5px solid var(--navy);
+  padding: 22px 26px 0; display: flex; flex-direction: column; gap: 20px;
+}
+h1, h2, h3 { margin: 0; color: var(--navy); text-wrap: balance; }
+h1 { font-size: 1.75rem; line-height: 1.3; }
+h2 { font-size: 1.05rem; display: flex; align-items: center; gap: 10px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* 見出し：番号を紺の四角に入れ、下に表題線 */
+.chip-no { display: inline-grid; place-items: center; width: 26px; height: 26px; background: var(--head-bg); color: var(--head-fg); font-size: .9rem; font-weight: 700; flex: none; }
+.sec-head { display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; border-bottom: 1.5px solid var(--navy); }
+.sec-head p { margin: 0; color: var(--muted); font-size: .85rem; }
+
+/* 頭書き */
+.head { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: flex-end; justify-content: space-between; padding-bottom: 14px; border-bottom: 1.5px solid var(--navy); }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand svg { width: 46px; height: 46px; flex: none; }
+.brand b { display: block; font-size: 1.15rem; letter-spacing: .12em; color: var(--navy); }
+.brand b span { color: var(--kin); }
+.brand small { display: block; color: var(--muted); font-size: .78rem; letter-spacing: .2em; }
+.head .titles { flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.head .eyebrow { color: var(--muted); font-size: .85rem; letter-spacing: .04em; }
+.head .lead { margin: 0; max-width: 62ch; }
+.tag { display: inline-block; border: 1px solid var(--navy); color: var(--navy); font-size: .75rem; padding: 1px 8px; margin-left: 8px; vertical-align: middle; letter-spacing: .08em; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 26px; }
+@media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } .sheet { padding: 16px 16px 0; } }
+.col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* 条件 */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label, .field .label { font-weight: 700; font-size: .92rem; }
+.field .hint { color: var(--faint); font-size: .78rem; }
+.row { display: flex; gap: 10px; align-items: center; }
+.row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--blue); }
+.unit-input { display: flex; align-items: center; gap: 6px; }
+input[type="number"] {
+  width: 5.6em; font: inherit; font-variant-numeric: tabular-nums; text-align: right; padding: 5px 8px;
+  border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+}
+input[type="number"]:focus-visible, input[type="range"]:focus-visible, button:focus-visible, summary:focus-visible, input[type="checkbox"]:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.unit { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 420px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.presets button, .reset {
+  font: inherit; font-size: .8rem; padding: 4px 10px; border: 1px solid var(--navy); background: var(--paper); color: var(--navy); cursor: pointer;
+}
+.presets button[aria-pressed="true"] { background: var(--head-bg); color: var(--head-fg); }
+details { border-top: 1px solid var(--line); padding-top: 10px; }
+summary { cursor: pointer; font-weight: 700; font-size: .9rem; color: var(--navy); }
+details .inner { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: .88rem; }
+.check input { margin-top: 4px; accent-color: var(--blue); }
+
+/* 表 */
+table { border-collapse: collapse; width: 100%; font-size: .85rem; }
+th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+thead th { background: var(--head-bg); color: var(--head-fg); font-weight: 700; border-bottom: none; }
+td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.table-wrap { overflow-x: auto; }
+.table-wrap table.wide { min-width: 640px; }
+.conf { display: inline-block; font-size: .72rem; padding: 0 6px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.conf.hyp { border-color: var(--blue); color: var(--blue); font-weight: 700; }
+
+/* 結果 */
+.verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; padding: 16px 18px; background: var(--pale); }
+.verdict .big { font-size: 2.6rem; font-weight: 700; color: var(--blue); line-height: 1.1; }
+.verdict .big small { font-size: 1rem; color: var(--ink); font-weight: 700; margin-left: 4px; }
+.verdict .say { flex: 1 1 220px; min-width: 0; }
+.pill { display: inline-block; font-size: .8rem; font-weight: 700; padding: 2px 10px; border: 1.5px solid currentColor; }
+.pill.go { color: var(--go); } .pill.warn { color: var(--ink); background: var(--warn-fill); border-color: var(--warn); } .pill.stop { color: var(--stop); }
+.figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 520px) { .figs { grid-template-columns: minmax(0, 1fr); } }
+.fig { border-top: 3px solid var(--navy); padding-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.fig .k { font-size: .8rem; color: var(--muted); }
+.fig .v { font-size: 1.55rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fig .v small { font-size: .85rem; margin-left: 2px; }
+.fig .s { font-size: .76rem; color: var(--faint); }
+.meter { display: flex; flex-direction: column; gap: 6px; }
+.meter .track { position: relative; height: 34px; background: var(--pale); margin-top: 20px; }
+.meter .bar { position: absolute; left: 0; top: 7px; height: 20px; background: var(--blue); }
+.meter .need { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2.5px solid var(--stop); }
+.meter .need span { position: absolute; top: -20px; left: -4px; font-size: .74rem; color: var(--stop); font-weight: 700; white-space: nowrap; }
+.meter .axis { display: flex; justify-content: space-between; font-size: .72rem; color: var(--faint); font-variant-numeric: tabular-nums; }
+.meter p, .first p { margin: 0; }
+.first { display: flex; flex-direction: column; gap: 4px; border-left: 4px solid var(--navy); padding: 4px 0 4px 12px; }
+.upside { font-size: .85rem; padding: 8px 12px; background: var(--warn-fill); border-left: 4px solid var(--warn); }
+.chart { width: 100%; height: auto; display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: .78rem; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; margin-right: 5px; vertical-align: -1px; }
+
+/* 式 */
+.formula { display: flex; flex-direction: column; gap: 6px; font-size: .88rem; }
+.formula div { display: grid; grid-template-columns: 11em minmax(0, 1fr); gap: 10px; border-bottom: 1px dashed var(--line); padding-bottom: 6px; }
+.formula b { color: var(--navy); }
+@media (max-width: 560px) { .formula div { grid-template-columns: minmax(0, 1fr); gap: 2px; } }
+.prices { font-size: .82rem; }
+
+/* 表題欄（右下） */
+.titleblock { display: flex; justify-content: flex-end; margin: 4px -26px 0; border-top: 1.5px solid var(--navy); }
+@media (max-width: 860px) { .titleblock { margin: 4px -16px 0; } }
+.titleblock dl { display: grid; grid-template-columns: repeat(4, auto); margin: 0; border-left: 1.5px solid var(--navy); font-size: .76rem; }
+.titleblock dl div { padding: 6px 12px; border-right: 1px solid var(--navy); min-width: 0; }
+.titleblock dl div:last-child { border-right: none; }
+.titleblock dt { color: var(--faint); font-size: .68rem; }
+.titleblock dd { margin: 0; color: var(--navy); font-weight: 700; }
+@media (max-width: 640px) { .titleblock dl { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; border-left: none; } .titleblock dl div { border-bottom: 1px solid var(--navy); } }
+.note { color: var(--faint); font-size: .76rem; margin: 0; }
+@media (prefers-reduced-motion: no-preference) { .meter .bar { transition: width .25s ease; } }
+</style>
+
+<div class="sheet">
+  <header class="head">
+    <div class="brand" aria-label="KANTSUGI カンツギ">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <path d="M8 28 L8 8 L28 8 M8 92 L8 112 L28 112 M112 92 L112 112 L92 112" fill="none" stroke="var(--navy)" stroke-width="7" stroke-linecap="square"/>
+        <polygon points="31.2,50.5 58,66 58,97 31.2,81.5" fill="var(--navy)"/>
+        <polygon points="58,66 84.8,50.5 84.8,81.5 58,97" fill="var(--muted)"/>
+        <polygon points="58,35 84.8,50.5 58,66 31.2,50.5" fill="none" stroke="var(--kin)" stroke-width="2.4" stroke-linejoin="round"/>
+        <polyline points="31.2,66.6 38.1,76.2 44.6,73.1 51.3,85.1 58,84.6 65.5,74.7 72,79.6 78.4,67.9 84.8,66" fill="none" stroke="var(--kin)" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"/>
+        <g fill="var(--kin)"><circle cx="90" cy="32" r="3.8"/><circle cx="99" cy="23" r="3.2"/><circle cx="107" cy="15" r="2.6"/><circle cx="114" cy="8" r="2"/></g>
+      </svg>
+      <div><b>KAN<span>TSUGI</span></b><small>カンツギ｜勘継</small></div>
+    </div>
+    <div class="titles">
+      <span class="eyebrow">AIグラスの導入効果を、自分の会社の数字で確かめる<span class="tag">試算・デモ</span></span>
+      <h1>導入効果シミュレーター</h1>
+      <p class="lead">条件を変えると、1拠点（支店・営業所）で1年に浮く人件費と、当社への支払いが計算し直されます。式は事業計画書と同じです。初期値は統計の値と、当社の想定です。</p>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- 条件 -->
+    <section class="col" aria-labelledby="cond-h">
+      <div class="sec-head">
+        <h2 id="cond-h"><span class="chip-no">1</span>条件：お客様の数字に変える</h2>
+        <p>使う人の分だけ数える。全社員の時間が減る、とは数えない</p>
+      </div>
+
+      <div class="field">
+        <label for="devices">AIグラスの台数（1拠点）</label>
+        <div class="row">
+          <input type="range" id="devices-r" min="1" max="40" step="1" value="10" aria-label="台数のスライダー">
+          <span class="unit-input"><input type="number" id="devices" min="1" max="200" step="1" value="10"><span class="unit">台</span></span>
+        </div>
+        <span class="hint">1班に1台、職長が掛ける。5現場×2班なら10台</span>
+      </div>
+
+      <div class="field">
+        <label for="display">うち、図面を手元に出す台数（表示付き）</label>
+        <span class="unit-input"><input type="number" id="display" min="0" max="200" step="1" value="2"><span class="unit">台</span></span>
+        <span class="hint">残りはカメラ付きのAIグラス（記録用）</span>
+      </div>
+
+      <div class="field">
+        <span class="label">1台1日に減る時間</span>
+        <div class="presets" role="group" aria-label="削減時間の例">
+          <button type="button" data-w="10" data-m="15" aria-pressed="false">控えめ 25分</button>
+          <button type="button" data-w="15" data-m="20" aria-pressed="true">当社の想定 35分</button>
+          <button type="button" data-w="25" data-m="35" aria-pressed="false">効果が出た班 60分</button>
+        </div>
+        <div class="pair">
+          <div class="field">
+            <label for="minW">職長（日報・撮影）</label>
+            <span class="unit-input"><input type="number" id="minW" min="0" max="240" step="1" value="15"><span class="unit">分／日</span></span>
+          </div>
+          <div class="field">
+            <label for="minM">施工管理者（写真整理・台帳）</label>
+            <span class="unit-input"><input type="number" id="minM" min="0" max="240" step="1" value="20"><span class="unit">分／日</span></span>
+          </div>
+        </div>
+        <span class="hint">仮説の値です。試験導入で、導入前2週間と導入後4週間を比べて測ります</span>
+      </div>
+
+      <div class="pair">
+        <div class="field">
+          <label for="salW">職長の年収</label>
+          <span class="unit-input"><input type="number" id="salW" min="100" max="2000" step="1" value="551"><span class="unit">万円</span></span>
+        </div>
+        <div class="field">
+          <label for="salM">施工管理者の年収</label>
+          <span class="unit-input"><input type="number" id="salM" min="100" max="2000" step="1" value="620"><span class="unit">万円</span></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="days">使う日数</label>
+        <span class="unit-input"><input type="number" id="days" min="1" max="366" step="1" value="240"><span class="unit">日／年</span></span>
+      </div>
+
+      <details>
+        <summary>細かい前提（会社負担・労働時間・手戻り）</summary>
+        <div class="inner">
+          <div class="pair">
+            <div class="field">
+              <label for="load">会社負担（社会保険料など）</label>
+              <span class="unit-input"><input type="number" id="load" min="1" max="2" step="0.01" value="1.17"><span class="unit">倍</span></span>
+            </div>
+            <div class="field">
+              <label for="hours">年間の総実労働時間</label>
+              <span class="unit-input"><input type="number" id="hours" min="1000" max="3000" step="1" value="1938"><span class="unit">時間</span></span>
+            </div>
+          </div>
+          <span class="hint">総実労働時間は残業を含む実績（建設業 月161.5時間×12）。所定の時間で割ると単価が高く出るので使わない</span>
+          <label class="check"><input type="checkbox" id="rework"><span>手戻りの削減も上振れとして見る（計画には入れない。実証で測れてから足す）</span></label>
+          <div class="field">
+            <label for="sales">完成工事高（1拠点）</label>
+            <span class="unit-input"><input type="number" id="sales" min="1" max="1000" step="1" value="30"><span class="unit">億円</span></span>
+            <span class="hint">手戻り2% × 対象の工種30% × 削減20% で計算</span>
+          </div>
+        </div>
+      </details>
+
+      <button type="button" class="reset" id="reset">初期値に戻す</button>
+
+      <div class="table-wrap prices">
+        <table>
+          <thead><tr><th>当社の値段（見積）</th><th class="r">金額</th></tr></thead>
+          <tbody>
+            <tr><td>会社の基盤（記録の置き場・管理画面・報告書の型）</td><td class="r">月5万円</td></tr>
+            <tr><td>端末ライセンス（1台）</td><td class="r">月2万円</td></tr>
+            <tr><td>導入支援（初年度だけ・約2か月）</td><td class="r">200万円</td></tr>
+            <tr><td>AIグラスのリース（お客様名義・手続きは当社）</td><td class="r">1台 月2,400〜3,600円</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 結果 -->
+    <section class="col" aria-labelledby="res-h" aria-live="polite">
+      <div class="sec-head">
+        <h2 id="res-h"><span class="chip-no">2</span>結果：1拠点・1年あたり</h2>
+        <p>計画に入れるのは書類の時間だけ。手戻りと新人指導は、測れてから足す</p>
+      </div>
+
+      <div class="verdict">
+        <div class="big num" id="ratio">1.5<small>倍</small></div>
+        <div class="say">
+          <span class="pill go" id="pill">元が取れる</span>
+          <div id="ratio-say">浮く人件費は、当社への支払いの約1.5倍</div>
+        </div>
+      </div>
+
+      <div class="figs">
+        <div class="fig"><span class="k">浮く人件費</span><span class="v" id="value">499<small>万円</small></span><span class="s" id="value-s">1年あたり</span></div>
+        <div class="fig"><span class="k">お客様の支払い</span><span class="v" id="cost">332<small>万円</small></span><span class="s" id="cost-s">利用料300＋リース32</span></div>
+        <div class="fig"><span class="k">浮く時間</span><span class="v" id="freed">1,400<small>時間</small></span><span class="s" id="freed-s">現場の仕事と若手の指導に戻る</span></div>
+      </div>
+
+      <div class="meter">
+        <p><b>元が取れる条件：</b><span id="be-say">1台1日 23分 減れば元が取れる（今の条件は35分）</span></p>
+        <div class="track" aria-hidden="true"><div class="bar" id="bar"></div><div class="need" id="need"><span id="need-l">23分</span></div></div>
+        <div class="axis" id="axis" aria-hidden="true"></div>
+      </div>
+
+      <div class="first">
+        <p><b>初年度：</b><span id="first-say"></span></p>
+        <p><b>2年目から：</b><span id="next-say"></span></p>
+      </div>
+
+      <div class="upside" id="upside" hidden></div>
+
+      <div class="field">
+        <span class="label">5年で見ると（万円）</span>
+        <svg class="chart" id="chart" viewBox="0 0 640 260" role="img" aria-label="5年間の効果と支払い、累計の差し引き"></svg>
+        <div class="legend"><span><i style="background:var(--blue)"></i>浮く人件費</span><span><i style="background:var(--line)"></i>お客様の支払い</span><span><i style="background:var(--go)"></i>累計の差し引き</span></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 式と前提 -->
+  <section class="col" aria-labelledby="f-h">
+    <div class="sec-head">
+      <h2 id="f-h"><span class="chip-no">3</span>式と前提：数字の出どころ</h2>
+      <p>事業計画書の計算モデルと同じ式。いま入っている数字で計算した値を表示している</p>
+    </div>
+    <div class="formula" id="formula"></div>
+    <div class="table-wrap">
+      <table class="wide">
+        <thead><tr><th>前提</th><th class="r">初期値</th><th>確度</th><th>出どころ・確かめ方</th></tr></thead>
+        <tbody>
+          <tr><td>職長の年収</td><td class="r">551万円</td><td><span class="conf">統計</span></td><td>賃金構造基本統計調査（令和5年）電気工事従事者：月36.74万円×12＋賞与110.06万円</td></tr>
+          <tr><td>施工管理者の年収</td><td class="r">620万円</td><td><span class="conf">統計</span></td><td>近い職種で代用：建築技術者 約642万円と土木技術者 約604万円の間</td></tr>
+          <tr><td>会社負担</td><td class="r">1.17倍</td><td><span class="conf">制度</span></td><td>健保 約5%＋厚年 9.15%＋雇用 約1%＋子ども・子育て拠出金 0.36%＋労災</td></tr>
+          <tr><td>年間の総実労働時間</td><td class="r">1,938時間</td><td><span class="conf">統計</span></td><td>毎月勤労統計調査（令和6年）建設業 月161.5時間×12。残業を含む</td></tr>
+          <tr><td>1台1日に減る時間</td><td class="r">15＋20分</td><td><span class="conf hyp">仮説</span></td><td>試験導入で測る。合格ラインは「元が取れる条件」の分数</td></tr>
+          <tr><td>当社の値段</td><td class="r">1拠点10台 年300万円</td><td><span class="conf">見積</span></td><td>試験導入の3社に聞いて決める</td></tr>
+          <tr><td>AIグラスのリース</td><td class="r">1台 年2.9〜4.3万円</td><td><span class="conf">公表</span></td><td>本体 約8万円（カメラ付き）・約12万円（表示付き）× 3年リースの月額料率 約3%</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">この画面は事業計画のデモです。値段は見積、削減時間は仮説で、実証の結果で置き換えます。表示している金額は保証ではありません。</p>
+  </section>
+
+  <footer class="titleblock">
+    <dl>
+      <div><dt>件名</dt><dd>導入効果シミュレーター</dd></div>
+      <div><dt>対象</dt><dd>1拠点・1年</dd></div>
+      <div><dt>単位</dt><dd>万円・分・時間</dd></div>
+      <div><dt>版</dt><dd>2026.10 試算</dd></div>
+    </dl>
+  </footer>
+</div>
+
+<script>
+// 事業計画書の計算モデル（deck/tora_v2.js の customerValue）と同じ式。金額は万円
+const PRICE = { base: 60, perDevice: 24, setup: 200, leaseGlass: 2.88, leaseDisplay: 4.32 };
+const DEFAULTS = { devices: 10, display: 2, minW: 15, minM: 20, salW: 551, salM: 620, days: 240, load: 1.17, hours: 1938, sales: 30, rework: false };
+
+function calc(i) {
+  const hW = (i.salW * i.load) / i.hours * 10000;              // 円／時間
+  const hM = (i.salM * i.load) / i.hours * 10000;
+  const perDevDay = (i.minW / 60) * hW + (i.minM / 60) * hM;     // 円／台・日
+  const value = perDevDay * i.devices * i.days / 10000;          // 万円／年
+  const fee = PRICE.base + PRICE.perDevice * i.devices;
+  const lease = (i.devices - i.display) * PRICE.leaseGlass + i.display * PRICE.leaseDisplay;
+  const cost = fee + lease;
+  const mix = i.minW + i.minM;
+  const perMin = mix > 0 ? (hW * i.minW / mix + hM * i.minM / mix) / 60 : (hW + hM) / 2 / 60; // 同じ配分での1分の人件費（円）
+  const breakEven = cost * 10000 / (i.devices * i.days) / perMin;  // 分／台・日
+  const rework = i.sales * 10000 * 0.02 * 0.3 * 0.2;             // 上振れ（万円）
+  const first = cost + PRICE.setup;
+  return { hW, hM, perDevDay, value, fee, lease, cost, breakEven, rework, first,
+    ratio: value / cost, ratioUp: (value + rework) / cost, freed: (mix / 60) * i.devices * i.days,
+    firstMonths: value > 0 ? first / (value / 12) : Infinity };
+}
+
+const $ = (id) => document.getElementById(id);
+const man = (v) => Math.round(v).toLocaleString("ja-JP");
+const yen = (v) => (Math.round(v / 10) * 10).toLocaleString("ja-JP");
+const signed = (v) => (v < 0 ? "−" : "+") + man(Math.abs(v));
+const ids = ["devices", "display", "minW", "minM", "salW", "salM", "days", "load", "hours", "sales"];
+
+function read() {
+  const n = (id, min) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? Math.max(min, v) : DEFAULTS[id]; };
+  const i = { devices: Math.round(n("devices", 1)), display: Math.round(n("display", 0)), minW: n("minW", 0), minM: n("minM", 0),
+    salW: n("salW", 1), salM: n("salM", 1), days: n("days", 1), load: n("load", 1), hours: n("hours", 1), sales: n("sales", 0), rework: $("rework").checked };
+  i.display = Math.min(i.display, i.devices);
+  return i;
+}
+
+function render() {
+  const i = read(), r = calc(i);
+  $("devices-r").value = Math.min(40, i.devices);
+  // 判定
+  const ratio = r.ratio;
+  $("ratio").innerHTML = `${ratio.toFixed(1)}<small>倍</small>`;
+  const pill = $("pill");
+  if (ratio >= 1.5) { pill.className = "pill go"; pill.textContent = "元が取れる"; }
+  else if (ratio >= 1) { pill.className = "pill warn"; pill.textContent = "元は取れるが余裕が小さい"; }
+  else { pill.className = "pill stop"; pill.textContent = "元が取れない"; }
+  $("ratio-say").textContent = `浮く人件費は、当社への支払いの約${ratio.toFixed(1)}倍`;
+  $("value").innerHTML = `${man(r.value)}<small>万円</small>`;
+  $("value-s").textContent = `1台1日 約${yen(r.perDevDay)}円 × ${i.devices}台 × ${man(i.days)}日`;
+  $("cost").innerHTML = `${man(r.cost)}<small>万円</small>`;
+  $("cost-s").textContent = `利用料${man(r.fee)}＋リース${man(r.lease)}`;
+  $("freed").innerHTML = `${man(r.freed)}<small>時間</small>`;
+  // 元が取れる条件
+  const now = i.minW + i.minM, need = r.breakEven;
+  $("be-say").textContent = Number.isFinite(need)
+    ? `1台1日 ${Math.round(need)}分 減れば元が取れる（今の条件は${man(now)}分）`
+    : "条件を入れてください";
+  const max = Math.max(10, Math.ceil(Math.max(now, need) * 1.25 / 10) * 10);
+  $("bar").style.width = `${Math.min(100, now / max * 100)}%`;
+  $("need").style.left = `${Math.min(100, need / max * 100)}%`;
+  $("need-l").textContent = `必要 ${Math.round(need)}分`;
+  const step = max <= 60 ? 10 : max <= 120 ? 20 : 50;
+  const ticks = []; for (let t = 0; t <= max; t += step) ticks.push(`<span>${t}分</span>`);
+  $("axis").innerHTML = ticks.join("");
+  // 初年度と2年目
+  const net1 = r.value - r.first, net2 = r.value - r.cost;
+  $("first-say").textContent = `支払い ${man(r.first)}万円（導入支援${PRICE.setup}万円を含む）は、浮く人件費の${Number.isFinite(r.firstMonths) ? "約" + Math.round(r.firstMonths) + "か月分" : "─"}。差し引き ${signed(net1)}万円`;
+  $("next-say").textContent = `毎年 ${signed(net2)}万円（浮く人件費${man(r.value)} − 支払い${man(r.cost)}）`;
+  // 上振れ
+  const up = $("upside");
+  up.hidden = !i.rework;
+  up.textContent = `手戻りの削減（上振れ）を入れると、年 ${man(r.rework)}万円が加わり、支払いの約${r.ratioUp.toFixed(1)}倍。ただし実証で測れるまで計画には入れません。`;
+  // 式
+  $("formula").innerHTML = [
+    ["1時間の人件費", `年収 × 会社負担 ÷ 総実労働時間 ＝ 職長 ${man(i.salW)}万円×${i.load}÷${man(i.hours)}時間 ≒ <b>${yen(r.hW)}円</b>、施工管理者 ≒ <b>${yen(r.hM)}円</b>`],
+    ["浮く人件費", `（${i.minW}分÷60×${yen(r.hW)}円 ＋ ${i.minM}分÷60×${yen(r.hM)}円）× ${i.devices}台 × ${man(i.days)}日 ≒ <b>${man(r.value)}万円</b>`],
+    ["お客様の支払い", `基盤 ${PRICE.base}万円 ＋ 端末 ${PRICE.perDevice}万円×${i.devices}台 ＋ リース ${r.lease.toFixed(1)}万円 ＝ <b>${r.cost.toFixed(1)}万円</b>`],
+    ["元が取れる条件", `支払い ÷（台数×日数）÷ 同じ配分での1分の人件費 ≒ <b>1台1日 ${need.toFixed(1)}分</b>`],
+  ].map(([k, v]) => `<div><span>${k}</span><span>${v}</span></div>`).join("");
+  drawChart(r);
+  document.querySelectorAll(".presets button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.w === i.minW && +b.dataset.m === i.minM)));
+}
+
+// 5年の棒（浮く人件費・支払い）と累計の差し引きの線。1つの縦軸で描く
+function drawChart(r) {
+  const years = [1, 2, 3, 4, 5];
+  const val = years.map(() => r.value), pay = years.map((y) => (y === 1 ? r.first : r.cost));
+  let c = 0; const cum = years.map((y, k) => (c += val[k] - pay[k]));
+  const W = 640, H = 260, L = 56, R = 16, T = 16, B = 34;
+  const hi = Math.max(...val, ...pay, ...cum, 0), lo = Math.min(0, ...cum);
+  const raw = (hi - lo) / 5, mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+  const stepV = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) || raw;
+  const top = Math.ceil(hi / stepV) * stepV, bot = Math.floor(lo / stepV) * stepV;
+  const y = (v) => T + (top - v) / (top - bot || 1) * (H - T - B);
+  const slot = (W - L - R) / years.length, bw = Math.min(26, slot * 0.22);
+  const css = (n) => `var(--${n})`;
+  let s = "";
+  for (let v = bot; v <= top + 1e-9; v += stepV) {
+    s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="${css(v === 0 ? "muted" : "line")}" stroke-width="${v === 0 ? 1.2 : 0.6}"/>`;
+    s += `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="${css("faint")}">${Math.round(v).toLocaleString("ja-JP")}</text>`;
+  }
+  years.forEach((yr, k) => {
+    const cx = L + slot * k + slot / 2;
+    s += `<rect x="${cx - bw - 2}" y="${y(val[k])}" width="${bw}" height="${y(0) - y(val[k])}" fill="${css("blue")}"/>`;
+    s += `<rect x="${cx + 2}" y="${y(pay[k])}" width="${bw}" height="${y(0) - y(pay[k])}" fill="${css("line")}"/>`;
+    s += `<text x="${cx}" y="${H - 12}" text-anchor="middle" font-size="12" fill="${css("muted")}">${yr}年目</text>`;
+  });
+  const pts = cum.map((v, k) => [L + slot * k + slot / 2, y(v)]);
+  s += `<polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="${css("go")}" stroke-width="2.5"/>`;
+  pts.forEach(([px, py], k) => {
+    const neg = cum[k] < 0;
+    s += `<circle cx="${px}" cy="${py}" r="4.5" fill="${css(neg ? "stop" : "go")}" stroke="${css("paper")}" stroke-width="1.5"/>`;
+    s += `<text x="${px}" y="${neg ? py + 18 : py - 10}" text-anchor="middle" font-size="12" font-weight="700" fill="${css(neg ? "stop" : "go")}" stroke="${css("paper")}" stroke-width="4" paint-order="stroke">${signed(cum[k])}</text>`;
+  });
+  $("chart").innerHTML = s;
+}
+
+// 入力のつなぎ
+$("devices-r").addEventListener("input", (e) => { $("devices").value = e.target.value; render(); });
+ids.forEach((id) => $(id).addEventListener("input", render));
+$("rework").addEventListener("change", render);
+document.querySelectorAll(".presets button").forEach((b) => b.addEventListener("click", () => { $("minW").value = b.dataset.w; $("minM").value = b.dataset.m; render(); }));
+$("reset").addEventListener("click", () => { ids.forEach((id) => ($(id).value = DEFAULTS[id])); $("rework").checked = false; render(); });
+render();
+</script>
