@@ -26,8 +26,9 @@ done
 python3 tools/notes_md.py カンツギ_事業計画書_16枚版.pptx 16枚版_台本.md
 python3 tools/notes_md.py カンツギ_事業計画書_10分16枚版.pptx 10分16枚版_台本.md
 python3 tools/notes_md.py カンツギ_サービス説明資料.pptx サービス説明資料_台本.md
+python3 tools/md_pdf.py カンツギ_想定問答.md "$TMP/qa.html" && node tools/html_pdf.js "$TMP/qa.html" カンツギ_想定問答.pdf
 rm -f カンツギ_資料一式.zip
-zip -q -j "$TMP/all.zip" カンツギ_事業計画書_*.pptx カンツギ_事業計画書_*.pdf カンツギ_サービス説明資料*.pptx カンツギ_サービス説明資料*.pdf $(ls カンツギ_計算詳細版_裏取り.* 2>/dev/null) 作業計画書_10月13日-22日.pdf *.md
+zip -q -j "$TMP/all.zip" カンツギ_事業計画書_*.pptx カンツギ_事業計画書_*.pdf カンツギ_サービス説明資料*.pptx カンツギ_サービス説明資料*.pdf $(ls カンツギ_計算詳細版_裏取り.* 2>/dev/null) カンツギ_想定問答.pdf 作業計画書_10月13日-22日.pdf *.md
 mv "$TMP/all.zip" カンツギ_資料一式.zip
 rm -rf "$TMP"
 echo done
