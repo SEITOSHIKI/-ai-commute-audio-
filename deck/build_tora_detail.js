@@ -28,7 +28,9 @@ const d15 = { devices: 15, mix: { glass: 12, display: 3 } };
 const be = Math.round(CV.breakEvenMin);
 const oku = (v) => (v >= 10000 ? Math.floor(v / 10000) + "億" + (v % 10000 ? fmt(v % 10000) + "万円" : "円") : fmt(v) + "万円");
 const fundTotal = V.GROWTH.funding.reduce((a, b) => a + b, 0) + 500;
-const OPT = { p216: V.run({ plan: { baseFee: 36, deviceFee: 18 } }).rows, d15: V.run({ plan: d15 }).rows, c5: V.run({ churnRate: 0.05 }).rows };
+const OPT = { p216: V.run({ plan: { baseFee: 36, deviceFee: 18 } }).rows, d15: V.run({ plan: d15 }).rows, d12: V.run({ plan: { devices: 12 } }).rows, d11: V.run({ plan: { devices: 11 } }).rows, c5: V.run({ churnRate: 0.05 }).rows, c20: V.run({ churnRate: 0.2 }).rows };
+// 5年目の黒字ライン：拠点で約6、台数なら1拠点12台（11台では届かない）
+const GAP_SITES = Math.ceil(-PLAN.rows[4].op / V.unit().gpYear), PER_STAFF = PLAN.rows[4].payroll / PLAN.rows[4].staff;
 const R10 = V.run({ years: 10 }).rows;
 const CV216 = V.customerValue({ plan: { baseFee: 36, deviceFee: 18 } });
 const foot = (s, t) => txt(s, t, { x: X0, y: 4.98, w: W, h: 0.26, size: S.note, color: K.gray500 });
@@ -215,10 +217,11 @@ async function main() {
     tag(s, TAGS[3]);
     heading(s, `数字の木：5年目の営業損益 約${tri(Math.round(Y5.op / 10) * 10)}万円を分解する`, "どの数字を聞かれても、この木のどこかを指せば答えられる（単位：百万円）");
     const nb = (x, y, w, label, val, f, o = {}) => {
-      box(s, { x, y, w, h: 0.62, fill: o.dark ? K.ink : o.acc ? K.paper : K.fill, line: o.acc ? ACC : undefined, lw: 1.75 });
+      const hh = o.h || 0.62;
+      box(s, { x, y, w, h: hh, fill: o.dark ? K.ink : o.acc ? K.paper : K.fill, line: o.acc ? ACC : undefined, lw: 1.75 });
       const c = o.dark ? K.paper : K.ink;
-      txt(s, [run(label + "  ", { fontSize: 8.5 }), run(val, { bold: true, fontSize: 13, color: o.dark ? YELLOW : o.acc ? ACC : K.ink })], { x: x + 0.08, y: y + 0.02, w: w - 0.16, h: 0.32, color: c, valign: "middle" });
-      txt(s, f, { x: x + 0.08, y: y + 0.33, w: w - 0.16, h: 0.26, size: 7.5, color: o.dark ? K.paper : K.gray700, valign: "middle" });
+      txt(s, [run(label + "  ", { fontSize: 8.5 }), run(val, { bold: true, fontSize: hh < 0.6 ? 12 : 13, color: o.dark ? YELLOW : o.acc ? ACC : o.neg ? RED : K.ink })], { x: x + 0.08, y: y + 0.02, w: w - 0.16, h: hh * 0.52, color: c, valign: "middle" });
+      txt(s, f, { x: x + 0.08, y: y + hh * 0.53, w: w - 0.16, h: hh * 0.43, size: 7.5, color: o.dark ? K.paper : K.gray700, valign: "middle" });
     };
     const d = (v) => (v / 100).toFixed(1);
     nb(X0, 2.6, 1.75, "営業損益", d(Y5.op), "粗利 − 販管費", { dark: true });
@@ -226,35 +229,41 @@ async function main() {
     nb(2.45, 3.75, 1.9, "販管費", d(Y5.sga), "人件費−振替＋採用費＋その他");
     nb(4.65, 1.12, 2.3, "利用料の粗利", d(Y5.license - Y5.licCost), `利用料${d(Y5.license)}−AI・保存${d(Y5.licCost)}`);
     nb(4.65, 1.84, 2.3, "サービスの粗利", d(Y5.service - Y5.setupCost - Y5.contractLabor), `支援・個社設定${d(Y5.service)}−人件費・交通${d(Y5.setupCost + Y5.contractLabor)}`);
-    nb(4.65, 3.3, 2.3, "人件費", d(Y5.payroll), `社員${Y5.staff}人・役割別の年収×1.2`);
-    nb(4.65, 4.02, 2.3, "振替／その他", `−${d(Y5.transfer)}／+${d(Y5.recruit + Y5.other)}`, "原価へ振替／採用費・家賃・広告など");
+    nb(4.65, 2.95, 2.3, "人件費", d(Y5.payroll), `社員${Y5.staff}人・役割別の年収×1.2`, { h: 0.52 });
+    nb(4.65, 3.55, 2.3, "原価への振替", `−${d(Y5.transfer)}`, "導入支援・個社設定の人件費は原価へ", { h: 0.52, neg: true });
+    nb(4.65, 4.15, 2.3, "採用費・家賃・広告など", `+${d(Y5.recruit + Y5.other)}`, `採用${d(Y5.recruit)}＋その他・顧問${d(Y5.other)}`, { h: 0.52 });
     nb(7.25, 1.1, 2.35, "前の年までの利用料", d(Y5.existing), `（期首${Y5.prev}−解約${Y5.ch}）拠点×300万円`, { acc: true });
     nb(7.25, 1.76, 2.35, "新しいお客様の利用料", d(Y5.newLic), `新規${Y5.nw}拠点×300万円×半年`, { acc: true });
     nb(7.25, 2.48, 2.35, "導入支援", d(Y5.setup), `新規${Y5.nw}拠点×200万円`);
     const vline = (x, y1, y2) => s.addShape("line", { x, y: y1, w: 0, h: y2 - y1, line: { color: K.gray500, width: 1 } });
     vline(2.3, 1.76, 4.06); hline(s, 2.15, 2.91, 0.15, K.gray500, 1); hline(s, 2.3, 1.76, 0.15, K.gray500, 1); hline(s, 2.3, 4.06, 0.15, K.gray500, 1);
     vline(4.5, 1.43, 2.15); hline(s, 4.35, 1.76, 0.15, K.gray500, 1); hline(s, 4.5, 1.43, 0.15, K.gray500, 1); hline(s, 4.5, 2.15, 0.15, K.gray500, 1);
-    vline(4.5, 3.61, 4.33); hline(s, 4.35, 4.06, 0.15, K.gray500, 1); hline(s, 4.5, 3.61, 0.15, K.gray500, 1); hline(s, 4.5, 4.33, 0.15, K.gray500, 1);
+    vline(4.5, 3.21, 4.41); hline(s, 4.35, 4.06, 0.15, K.gray500, 1); hline(s, 4.5, 3.21, 0.15, K.gray500, 1); hline(s, 4.5, 3.81, 0.15, K.gray500, 1); hline(s, 4.5, 4.41, 0.15, K.gray500, 1);
     vline(7.1, 1.41, 2.07); hline(s, 6.95, 1.43, 0.15, K.gray500, 1); hline(s, 7.1, 2.07, 0.15, K.gray500, 1);
     hline(s, 6.95, 2.15, 0.15, K.gray500, 1); vline(7.1, 2.15, 2.79); hline(s, 7.1, 2.79, 0.15, K.gray500, 1);
-    box(s, { x: 7.25, y: 3.3, w: 2.35, h: 1.34, fill: K.ink });
-    txt(s, [run("動かせるのは3つだけ", { bold: true, color: YELLOW, breakLine: true }), run("① 拠点数（新規−解約）", { breakLine: true }), run("② 1拠点の台数", { breakLine: true }), run("③ 社員数（採用のペース）")], { x: 7.37, y: 3.35, w: 2.15, h: 1.25, size: 9.5, color: K.paper, valign: "middle", psa: 2 });
-    foot(s, `個社設定（${d(Y5.contract)}百万円・当社の導入コンサルタントが行う）はサービスに含む。端数は四捨五入`);
+    box(s, { x: 7.25, y: 3.2, w: 2.35, h: 1.72, fill: K.ink });
+    txt(s, [run("黒字にするには（どれか1つ）", { bold: true, color: YELLOW, breakLine: true }),
+      run(`① 拠点を約${GAP_SITES}増やす（${Y5.sites + GAP_SITES}拠点）`, { breakLine: true }),
+      run("② 1拠点12台にする（11台では届かない）", { breakLine: true }),
+      run(`③ 社員を2人減らす（1人 約${fmt(Math.round(PER_STAFF / 10) * 10)}万円）`, { breakLine: true }),
+      run("動かせるのは拠点数・台数・社員数", { fontSize: 8, color: YELLOW })], { x: 7.35, y: 3.22, w: 2.17, h: 1.68, size: 8.5, color: K.paper, valign: "middle", psa: 2 });
+    foot(s, `原価への振替＝導入支援と個社設定（${d(Y5.contract)}百万円）にかかった導入コンサルタントなどの人件費。原価に入れたので販管費から引く。端数は四捨五入`);
   }
 
   // ---------- 18 前提と懸念の一覧 ----------
   {
     const s = add(4);
     tag(s, TAGS[4]);
-    heading(s, "前提と懸念の一覧：確度の低いものから実証で測る", "統計＝公的統計・制度　公表＝メーカー・クラウドの公表価格　見積＝社内見積　仮説＝実証で測る");
-    const C = (t) => ({ text: t, bold: t === "仮説", color: t === "仮説" ? ACC : K.ink });
+    heading(s, "前提と懸念の一覧：確度の低いものから実証で測る", "統計＝公的統計・制度　公表＝公表価格　見積＝社内見積　仮定＝市販品の値を当てはめた　仮説＝実証で測る");
+    const C = (t) => ({ text: t, bold: t === "仮説" || t === "仮定", color: t === "仮説" || t === "仮定" ? ACC : K.ink });
     table(s, [["前提", "値", "確度", "懸念", "どう確かめるか"],
       ["1時間の人件費", `${fmt(h.e)}円／${fmt(h.m)}円`, C("統計"), "最新年の原表を未確認", "e-Statで令和6年値に差し替え"],
       ["1台1日の削減時間", "35分", C("仮説"), "効果の大半を占める", "実証で導入前後を記録"],
+      ["使う日数", "年240日", C("見積"), "上限に近い。現場の稼働日で減る", "実証先の稼働日で計算し直す（p.6）"],
       ["端末の台数", "1拠点10台", C("見積"), "職長だけで足りるか", "実証で班ごとに使い方を見る"],
       ["値段", "基盤月5万＋月2万／台", C("見積"), "払ってもらえるか未検証", "実証3社に価格を聞く"],
-      ["AI・保存の原価", "1台月6,000円", C("公表"), "使い方で大きく変わる", "実証で台ごとの実費を測る"],
-      ["グラスとリース", "AIグラス8万・表示付き12万", C("公表"), "国内の正規販売・料率が未確認", "販売店・リース会社の見積"],
+      ["AI・保存の原価", "1台月6,000円", C("公表"), "内訳はp.11。画像の単価と保存の量で変わる", "実証で台ごとの実費を測る"],
+      ["グラスとリース", "AIグラス8万・表示付き12万", C("仮定"), "当社の用途に合う機種・国内リースは未確定", "販売店・リース会社の見積"],
       ["グラスの性能", "要所の記録で1日もつ", C("仮説"), "録画の長さ・電池・規格", "準備期に実機で1日使う"],
       ["導入支援", "42人日・200万円", C("見積"), "3D化で人日が増える", "1社目の実績で更新"],
       ["手戻りの削減", "対象30%×20%", C("仮説"), "AIの精度と監修の手間", "手戻り件数を実証で記録"],
@@ -262,7 +271,7 @@ async function main() {
       ["会える率・成約率", "45〜60%・15〜30%", C("仮説"), "4年続けられるか", "最初の商談で記録"],
       ["年収・採用費", "役割別×1.2＋紹介料", C("見積"), "採用市場の相場", "紹介会社の見積"],
       ["自己資金", "1年目2億＋3年目0.5億", C("見積"), "線を越えたときだけ入れる", "撤退ラインで判断"]],
-      { x: X0, y: 1.1, w: W, colW: [1.55, 1.85, 0.6, 2.4, 2.8], rowH: 0.27, size: 8, leftCols: [1, 3, 4], name: "assumptions" });
+      { x: X0, y: 1.1, w: W, colW: [1.55, 1.85, 0.6, 2.6, 2.6], rowH: 0.255, size: 8, leftCols: [1, 3, 4], name: "assumptions" });
     foot(s, "仮説の5つ（削減時間・グラスの性能・手戻り・値段への反応・会える率と成約率）が、500万円の実証で測る対象");
   }
   // ---------- 3 人件費 ----------
@@ -281,8 +290,8 @@ async function main() {
     txt(s, [lab("1,950時間との違い", { breakLine: true }), run("1日8時間 × 約244日 ＝ 1,952時間", { bold: true, breakLine: true }),
       run(`これは所定の時間の目安で、残業を含まない。統計の実績${fmt(V.WAGE.annualHours)}時間は残業込み。値は近いが意味が違うので、計画は統計の実績を使う`)], { x: X0 + 0.15, y, w: 4.15, h: 1.75, size: 9.5, valign: "middle", psa: 3 });
     box(s, { x: 5.15, y, w: 4.45, h: 1.75, line: ACC, lw: 1.5 });
-    txt(s, [lab("なぜ残業を含めるか", { breakLine: true }), run("年収には残業代が含まれるので、割る時間も残業を含めないと単価が高く出る。", { breakLine: true }),
-      run("書類の時間が減って残業が減るなら、その時間は割増25%の分だけ価値が高い（上振れ）")], { x: 5.3, y, w: 4.15, h: 1.75, size: 9.5, valign: "middle", psa: 3 });
+    txt(s, [lab("なぜ残業を含めるか", { breakLine: true }), run("総実労働時間＝所定内＋所定外（残業）。年収に残業代が入っているので、割る時間も残業を含める（含めないと単価が高く出る）", { breakLine: true }),
+      run(`削った時間が残業なら割増25%で、効果は約1.25倍（年約${fmt(CV.docs * 1.25)}万円）。計画では使わないので、お客様の効果は控えめに見ている。当社の売上はこの単価では変わらない`)], { x: 5.3, y, w: 4.15, h: 1.75, size: 8.5, valign: "middle", psa: 3 });
     foot(s, "年収は令和5年の値（令和6年の職業情報提供サイトでも約548〜551万円）。施工管理技士の年収は標本が少なく使わない。原表（e-Stat）で確認する");
   }
   // ---------- 4 削減時間 ----------
@@ -293,39 +302,40 @@ async function main() {
     const lw = 4.45, top = 1.12;
     box(s, { x: X0, y: top, w: lw, h: 1.5, fill: K.fill });
     txt(s, [lab("式", { breakLine: true }), run(`10台 × 年240日 ×（職長15分×${fmt(h.e)}円 ＋ 施工管理20分×${fmt(h.m)}円）`, { breakLine: true }),
-      run(`＝ 年 約${fmt(CV.docs)}万円`, { bold: true, fontSize: 16, color: ACC, breakLine: true }), run(`浮く時間は年${fmt(CV.freedHours)}時間（10台分）`, { fontSize: 9, color: K.gray700 })],
+      run(`＝ 年 約${fmt(CV.docs)}万円`, { bold: true, fontSize: 16, color: ACC, breakLine: true }), run(`浮く時間：10台×35分×240日＝84,000分＝年${fmt(CV.freedHours)}時間`, { fontSize: 9, color: K.gray700 })],
       { x: X0 + 0.15, y: top, w: lw - 0.3, h: 1.5, size: 9.5, valign: "middle", psa: 2 });
     table(s, [["中身（1台1日・仮説）", "誰の時間", "分"], ["日報・撮影・黒板の書き込み", "職長", "15"], ["写真の整理・写真台帳・報告書", "施工管理者", "20"]],
       { x: X0, y: top + 1.62, w: lw, colW: [2.65, 1.1, 0.7], rowH: 0.3, size: 9, name: "minutes" });
     const rx = 5.15, rw = 4.45;
     txt(s, "1台1日の削減分が変わったら", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
     const sens = [[10, 15], [15, 20], [25, 35]].map(([e, m]) => { const c = V.customerValue({ electricianMin: e, managerMin: m }); return [`${e + m}分`, `${fmt(c.docs)}万円`, { text: c.ratio.toFixed(1) + "倍", bold: e === 15, color: c.ratio < 1 ? RED : K.ink }, c.ratioUp.toFixed(1) + "倍"]; });
-    table(s, [["1台1日", "お客様の効果（書類）", "÷費用", "手戻り込み"], ...sens], { x: rx, y: top + 0.3, w: rw, colW: [0.9, 1.45, 0.95, 1.15], rowH: 0.3, size: 9, align: "center", strongRows: [2], name: "sens" });
-    box(s, { x: rx, y: top + 1.62, w: rw, h: 1.0, line: ACC, lw: 1.5 });
-    txt(s, [lab("借りてきた数字は使わない", { breakLine: true }), run("建設業の書類電子化の実績（月6.5時間）は原典を確認できておらず、ARグラスの効果とも違う。削減時間は実証で測る")], { x: rx + 0.15, y: top + 1.62, w: rw - 0.3, h: 1.0, size: 9.5, valign: "middle" });
+    table(s, [["1台1日", "お客様の効果（書類）", "÷費用", "手戻り込み"], ...sens], { x: rx, y: top + 0.3, w: rw, colW: [0.9, 1.45, 0.95, 1.15], rowH: 0.26, size: 9, align: "center", strongRows: [2], name: "sens" });
+    txt(s, "使う日数が減ったら（10台・35分）", { x: rx, y: top + 1.4, w: rw, h: 0.26, size: 10.5, bold: true });
+    const days = [240, 220, 200, 180].map((dd) => { const c = V.customerValue({ plan: { workDays: dd } }); return [`${dd}日`, `${fmt(c.docs)}万円`, { text: c.ratio.toFixed(2) + "倍", color: c.ratio < 1.2 ? RED : K.ink }, `${c.breakEvenMin.toFixed(0)}分`]; });
+    table(s, [["使う日数", "お客様の効果", "÷費用", "元が取れる分"], ...days], { x: rx, y: top + 1.68, w: rw, colW: [0.9, 1.45, 0.95, 1.15], rowH: 0.22, size: 8.5, align: "center", strongRows: [1], name: "days" });
     darkBox(s, X0, 3.95, W, 0.92, [lab("実証での測り方：", { dark: true }), run("導入前2週間と導入後4週間で、日報・写真整理・写真台帳にかかった時間を、職長と施工管理者が毎日記録（作業ログとアプリの操作記録で裏付け）。", { breakLine: true }),
       run(`合格ラインは1台1日${Math.round(CV.breakEvenMin)}分以上（p.8）`)], 9.5);
-    foot(s, "年240日は端末を使う日数の見積。1拠点10台は「1班に1台・職長が掛ける」前提（p.10）");
+    foot(s, "年240日は上限に近い見積。稼働日が減っても支払いは同じなので、元が取れる分は増える。10台は1班に1台・職長（p.10）");
   }
   // ---------- 5 手戻り・指導 ----------
   {
     const s = add(7);
     tag(s, TAGS[7]);
-    heading(s, "手戻りと新人指導：実証で測るまで計画に入れない", "AIの出力がそのまま現場で使える前提の数字は、計画に入れない");
+    heading(s, "手戻りと新人指導：金額にせず、件数と原因を記録する", "手戻り率は会社ごとの現場事情で大きく違い、検証の費用も見合わない可能性がある。計画にも提案の金額にも入れない");
     const lw = 4.45, top = 1.12;
-    txt(s, "手戻り：対象工種に絞って上振れに回す", { x: X0, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
+    txt(s, "手戻り：参考の計算（計画にも提案にも使わない）", { x: X0, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
     box(s, { x: X0, y: top + 0.3, w: lw, h: 1.0, fill: K.fill });
-    txt(s, [run("完成工事高30億円 × 手戻り2% × 対象工種30% × 削減20%", { breakLine: true }), run(`＝ 年${fmt(CV.rework)}万円（上振れ・計画に入れない）`, { bold: true, color: ACC })], { x: X0 + 0.15, y: top + 0.3, w: lw - 0.3, h: 1.0, size: 9.5, valign: "middle" });
-    txt(s, [lab("かかる手間（当社）", { breakLine: true }), run("・AIの出力はそのまま報告書にならない。現場監修が確認する", { breakLine: true }), run("・工種ごとに組立図の3D化とミス事例の登録がいる", { breakLine: true }),
-      run("→ 導入支援と現場監修の人件費として、当社の費用に入れた")], { x: X0, y: top + 1.42, w: lw, h: 1.3, size: 9.5, psa: 2 });
+    txt(s, [run("完成工事高30億円 × 手戻り2% × 対象工種30% × 削減20%", { breakLine: true }), run(`＝ 年${fmt(CV.rework)}万円（参考）`, { bold: true, color: ACC })], { x: X0 + 0.15, y: top + 0.3, w: lw - 0.3, h: 1.0, size: 9.5, valign: "middle" });
+    txt(s, [lab("金額にしない理由", { breakLine: true }), run("・手戻り率は会社ごと・工種ごとに大きく違い、各社で実証しないと分からない", { breakLine: true }), run("・何を手戻りとするかに、どうしても主観が入る", { breakLine: true }),
+      run("・検証そのものの費用（人日）が、効果の金額と釣り合わない可能性がある", { breakLine: true }), run("→ 件数と原因を記録に残す。記録があれば、後から原因を追える")], { x: X0, y: top + 1.42, w: lw, h: 1.4, size: 9, psa: 2 });
     const rx = 5.15, rw = 4.45;
     txt(s, "新人指導：金額にせず、3つの数で測る", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
     box(s, { x: rx, y: top + 0.3, w: rw, h: 1.0, line: ACC, lw: 1.5 });
     txt(s, "指導は他の仕事と混ざっていて、何を指導時間とするか決められない。年144万円は計画から外す", { x: rx + 0.15, y: top + 0.3, w: rw - 0.3, h: 1.0, size: 9.5, valign: "middle" });
     table(s, [["測る数", "測り方"], ["独り立ちまでの月数", "職長が「一人で任せられる」と判定した日"], ["先輩が付き添った時間", "日報に付き添いの時間を記録"], ["新人のやり直し件数", "検査での指摘・やり直しの記録"]],
       { x: rx, y: top + 1.42, w: rw, colW: [1.6, 2.85], rowH: 0.3, size: 9, leftCols: [1], name: "coach" });
-    darkBox(s, X0, 3.95, W, 0.92, [lab("計画に入れるのは書類の削減だけ：", { dark: true }), run(`年${fmt(CV.docs)}万円。手戻り${fmt(CV.rework)}万円と新人指導は、実証で数字が出てから加える。`, { breakLine: true }),
-      run("本編の導入効果（p.7）は、書類の時間だけで示している")]);
+    darkBox(s, X0, 3.95, W, 0.92, [lab("計画に入れるのは書類の削減だけ：", { dark: true }), run(`年${fmt(CV.docs)}万円。手戻りは件数と原因を記録し、金額にはしない。新人指導は月数・付き添い時間・やり直し件数で測る。`, { breakLine: true }),
+      run("本編・16枚版の導入効果も、書類の時間だけで示している")]);
     foot(s, "手戻り率2%は海外研究の範囲（工事費の0.4〜6%）から控えめに置いた。対象工種30%・削減20%は仮説");
   }
   // ---------- 6 元が取れる条件 ----------
@@ -406,26 +416,28 @@ async function main() {
   {
     const s = add(11);
     tag(s, TAGS[11]);
-    heading(s, `AI・保存の費用：積み上げると粗利率は${Math.round(V.marginSite() * 100)}%`, "端末1台あたりの処理代を、クラウド・AIの公表単価から積み上げた");
-    const top = 1.12, lw = 4.45;
+    heading(s, `AI・保存の費用：積み上げると粗利率は${Math.round(V.marginSite() * 100)}%`, "端末1台あたりの処理代を、クラウド・AIの公表単価から積み上げた（$1＝150円）");
+    const top = 1.12, lw = 5.5;
     txt(s, "端末1台あたりのAI・保存費（月）", { x: X0, y: top, w: lw, h: 0.26, size: 10.5, bold: true });
     const C = V.CLOUD;
     table(s, [["中身", "式", "円／月"],
-      ["音声の文字起こし", "1日4時間×20日＝4,800分×$0.003（多めに見た上限）", fmt(C.transcribe)],
-      ["大事な場面の画像解析", "3,000枚×約1,000トークン", fmt(C.vision)],
-      ["日報・報告書の文章生成", "20日分", fmt(C.report)],
-      ["動画の保存", "切り出した月10GBを3年保存", fmt(C.storage)],
-      ["転送・監視・端末管理・余裕", "", fmt(C.ops)],
+      ["音声の文字起こし", "録音1日4時間×20日＝4,800分×$0.003。削減時間（35分）とは関係なく、録音した時間に掛かる", fmt(C.transcribe)],
+      ["大事な場面の画像解析", "月3,000枚。1枚約1,200〜1,500トークン（指示・出力込み）を中間の単価で置いた（右下）", fmt(C.vision)],
+      ["日報・報告書の文章生成", "1日1件×20日（入力約2万・出力約2千トークン）", fmt(C.report)],
+      ["動画の保存", "大事な場面だけ切り出して月10GB。3年保存の平均180GB×$0.025（録画そのものは端末に残す）", fmt(C.storage)],
+      ["転送・監視・端末管理（MDM）・余裕", "", fmt(C.ops)],
       [{ text: "合計", bold: true }, "", { text: fmt(V.cloudPerDevice / 12 * 10000), bold: true }]],
-      { x: X0, y: top + 0.3, w: lw, colW: [1.7, 2.0, 0.75], rowH: 0.3, size: 8.5, leftCols: [1], strongRows: [6], name: "cloud" });
-    const rx = 5.15, rw = 4.45;
+      { x: X0, y: top + 0.3, w: lw, colW: [1.55, 3.25, 0.7], rowH: [0.26, 0.42, 0.42, 0.3, 0.42, 0.3, 0.28], size: 8, leftCols: [1], strongRows: [6], name: "cloud" });
+    const rx = 6.1, rw = 3.5;
     txt(s, "1拠点（10台）で見ると（年）", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
-    table(s, [["", "万円"], ["売上（基盤60＋端末240）", "300"], ["データ基盤（会社ごとの保管庫）", fmt(V.siteInfra)], ["AI・保存（1台7.2万円×10台）", fmt(V.cloudPerDevice * 10)], [{ text: "粗利", bold: true }, { text: `${fmt(300 - V.cogsSite())}（${Math.round(V.marginSite() * 100)}%）`, bold: true, color: ACC }]],
-      { x: rx, y: top + 0.3, w: rw, colW: [3.2, 1.25], rowH: 0.3, size: 9, strongRows: [4], name: "sitecost" });
-    box(s, { x: rx, y: top + 1.95, w: rw, h: 1.15, fill: K.fill });
-    txt(s, [lab("データ基盤とAI費用の違い", { breakLine: true }), run("データ基盤：会社ごとに1つ。図面・手順・権限・記録の保管庫", { breakLine: true }), run("AI費用：端末ごとに増える。録画の文字起こし・解析・保存")], { x: rx + 0.15, y: top + 1.95, w: rw - 0.3, h: 1.15, size: 9, valign: "middle", psa: 2 });
-    darkBox(s, X0, 4.25, W, 0.62, [lab("粗利率は妥当か：", { dark: true }), run("一般のSaaSは70〜80%、AIを多く使うサービスはそれより低いと言われる。72%はその範囲。実証で1台あたりの実費を測って更新する")], 9.5);
-    foot(s, "単価はクラウド・AIの公表価格（$1＝150円）からの見積。モデル・為替・値下げで変わる");
+    table(s, [["", "万円"], ["売上（基盤60＋端末240）", "300"], ["データ基盤（会社ごと）", fmt(V.siteInfra)], ["AI・保存（1台7.2万円×10台）", fmt(V.cloudPerDevice * 10)], [{ text: "粗利", bold: true }, { text: `${fmt(300 - V.cogsSite())}（${Math.round(V.marginSite() * 100)}%）`, bold: true, color: ACC }]],
+      { x: rx, y: top + 0.3, w: rw, colW: [2.45, 1.05], rowH: 0.27, size: 8.5, strongRows: [4], name: "sitecost" });
+    box(s, { x: rx, y: top + 1.75, w: rw, h: 1.0, fill: K.fill });
+    txt(s, [lab("画像1枚のトークンと単価", { breakLine: true }), run("1280×720の写真＝約1,230トークン（幅×高さ÷750）＋指示300＋出力150", { breakLine: true }),
+      run("Claude Haiku 5.5なら月約100円、Sonnet 5.5なら月約2,050円。全部をSonnetにしても粗利率は約68%", { bold: true })], { x: rx + 0.12, y: top + 1.75, w: rw - 0.24, h: 1.0, size: 8, valign: "middle", psa: 2 });
+    darkBox(s, X0, 3.95, W, 0.92, [lab("72%は高すぎないか：", { dark: true }), run("原価に入れているのはクラウドとAIの費用だけ。定着支援（導入コンサルタント）と現場監修（印付け）の人件費は販管費にある。", { breakLine: true }),
+      run("これらを原価に入れると、5年目の利用料の粗利率は約56%。分類を変えても営業利益は同じ。保存は3年平均で置いた（4年目以降は1台月+650円で約69%）")], 8.5);
+    foot(s, "単価の出典は p.32。モデルの値下げ・為替で変わるので、実証で1台あたりの実費を測って更新する");
   }
   // ---------- 10 トレードオフ ----------
   {
@@ -437,7 +449,9 @@ async function main() {
     const pct = (n, per) => Math.round(V.marginSite({ ...V.PLAN, devices: n }, per) * 100) + "%";
     table(s, [["台数", "大事な場面だけ\n（1台 月0.6万円）", "全編を毎秒解析\n（1台 月5万円）"], ...[5, 10, 25].map((n) => [n + "台", { text: pct(n, V.cloudPerDevice), bold: n === 10 }, { text: pct(n, V.FULL_UPLOAD_PER_DEVICE), color: RED, bold: true }])],
       { x: X0, y: top + 0.3, w: lw, colW: [0.95, 1.75, 1.75], rowH: [0.5, 0.32, 0.32, 0.32], size: 9, align: "center", name: "tradeoff" });
-    txt(s, "1台の値段（月2万円）が1台の原価（月0.6万円）を賄うので、台数を増やしても粗利率はほぼ一定。全編を送ると台数が増えるほど赤字が膨らむ", { x: X0, y: top + 1.85, w: lw, h: 0.75, size: 9, color: K.gray700 });
+    txt(s, "台数を増やしても粗利率はほぼ一定（1台の値段が1台の原価を賄う）。全編を送ると台数が増えるほど赤字が膨らむ", { x: X0, y: top + 1.82, w: lw, h: 0.38, size: 8.5, color: K.gray700 });
+    box(s, { x: X0, y: top + 2.2, w: lw, h: 0.66, line: ACC, lw: 1.5 });
+    txt(s, [lab("解析量のプラン（案）："), run("標準は1台 月3,000枚・保存10GBまで。超えたら1,000枚ごと月2,000円、10GBごと月1,000円。上限を超えても録画は止まらない（端末に残る）", {})], { x: X0 + 0.12, y: top + 2.2, w: lw - 0.24, h: 0.66, size: 8, valign: "middle" });
     const rx = 5.15, rw = 4.45;
     txt(s, "粗利率を守る4つの仕組み", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
     [["端末で切り出す", "録画は端末に全部残し、選んだ場面だけを送る（選び方は p.28）"], ["解析の上限と超過料金", "録画は無制限。AIで解析する場面に月の上限、超えたら従量"], ["撮影計画を営業と技術で決める", "提案の段階で「何を・誰が・何時間撮るか」を決めて見積に入れる"], ["毎月、台ごとの粗利を見る", "処理量が多い台は、使い方の見直しか料金の相談"]].forEach(([a, b], i) => {
@@ -462,9 +476,10 @@ async function main() {
     table(s, [["", "万円"], [`人件費 ${V.setupDays}人日×約3.0万円`, fmt(setupLabor)], ["交通費（16回訪問）", String(V.setupTravel)], [{ text: "原価", bold: true }, { text: fmt(setupCost), bold: true }], ["値段", "200"], [{ text: "粗利", bold: true }, { text: `${fmt(200 - setupCost)}（${Math.round((200 - setupCost) / 2)}%）`, bold: true, color: ACC }]],
       { x: rx, y: top, w: rw, colW: [2.6, 1.0], rowH: 0.3, size: 9, strongRows: [3], name: "setupcost" });
     txt(s, "日額＝導入コンサルタントの年収600万円×1.2÷240日", { x: rx, y: top + 1.9, w: rw, h: 0.4, size: 8.5, color: K.gray700 });
-    darkBox(s, X0, 3.65, W, 1.2, [lab("懸念と対策", { dark: true, breakLine: true }), run("・手元AR（3D化）を含めると人日が増える → 手元ARは工種ごとのオプション（初期50万円）に分けた", { breakLine: true }),
-      run("・1人で年6拠点（2か月で1拠点）が上限 → 新規が増えるほど導入コンサルタントの採用が先に要る（p.17）", { breakLine: true }),
-      run("・お客様の負担が重い → 着手金50%・試験導入の結果で本契約に切り替える")], 9);
+    darkBox(s, X0, 3.58, W, 1.33, [lab("懸念と対策", { dark: true, breakLine: true }), run("・お客様の支払いは1年目 約532万円（利用料300＋リース32＋導入支援200）、2年目から約332万円。当社の売上は利用料と導入支援だけ", { breakLine: true }),
+      run("・1人で年6拠点（2か月で1拠点）が上限。拠点を増やし過ぎると導入コンサルタントが足りない → 新規はコンサルの人数×6を上限に置いた（p.16〜17）", { breakLine: true }),
+      run("・営業は、拠点と台数を増やす段階まで採用を遅らせる案もある（裏取りのExcel「崩れたとき」）", { breakLine: true }),
+      run("・手元AR（3D化）は工種ごとのオプション（初期50万円）。お客様の負担は着手金50%で軽くする")], 8.5);
     foot(s, "他社の導入支援の相場は未確認。1社目の実績（人日・交通費）で更新する");
   }
   // ---------- 12 拠点と解約 ----------
@@ -482,10 +497,11 @@ async function main() {
       ["新規から入る利用料（半年分）", ...R2.map((r) => fmt(r.newLic))],
       ["解約で減った利用料", ...R2.map((r) => ({ text: r.churn ? "▲" + fmt(r.churn * V.priceSite()) : "0", color: r.churn ? RED : K.ink }))]],
       { x: X0, y: top, w: W, colW: [2.95, 1.25, 1.25, 1.25, 1.25, 1.25], rowH: 0.3, size: 9, strongRows: [4], name: "stock" });
-    box(s, { x: X0, y: 3.65, w: 4.45, h: 1.22, fill: K.fill });
-    txt(s, [lab("年10%の根拠", { breakLine: true }), run("海外の目安：B2B SaaSの年間の解約は大企業5〜10%、中小30〜50%。記録が貯まるほど乗り換えにくいので、中堅として低めに置いた（日本の調査は見つからず）")], { x: X0 + 0.15, y: 3.65, w: 4.15, h: 1.22, size: 9, valign: "middle", psa: 2 });
-    box(s, { x: 5.15, y: 3.65, w: 4.45, h: 1.22, line: ACC, lw: 1.5 });
-    txt(s, [lab("解約を減らす手", { breakLine: true }), run("月次の効果レポートで「何分減ったか」を毎月見せる。年額前払いで、更新の3か月前に効果の振り返りをする。解約の理由は必ず聞いて記録する")], { x: 5.3, y: 3.65, w: 4.15, h: 1.22, size: 9, valign: "middle", psa: 2 });
+    box(s, { x: X0, y: 3.6, w: 4.45, h: 1.32, fill: K.fill });
+    txt(s, [lab("年10%の根拠（弱い）", { breakLine: true }), run("海外の目安は大企業5〜10%、中小30〜50%。中堅なのに低めに置いた理由は2つ：①記録が貯まるほど乗り換えにくい ②電力会社・官公庁の写真台帳は書式が決まっていて、一度合わせると変えにくい。", { breakLine: true }),
+      run(`日本の実績はない。解約20%なら5年目${tri(M(OPT.c20[4].op))}百万円（p.21）`, { bold: true })], { x: X0 + 0.15, y: 3.6, w: 4.15, h: 1.32, size: 8.5, valign: "middle", psa: 2 });
+    box(s, { x: 5.15, y: 3.6, w: 4.45, h: 1.32, line: ACC, lw: 1.5 });
+    txt(s, [lab("解約を減らす手", { breakLine: true }), run("月次の効果レポートで「何分減ったか」を毎月見せる。年額前払いで、更新の3か月前に効果の振り返りをする。解約の理由は必ず聞いて記録する")], { x: 5.3, y: 3.6, w: 4.15, h: 1.32, size: 9, valign: "middle", psa: 2 });
     foot(s, "1年目の3拠点は有償の試験導入（利用料なし）。解約は期首に起きると置いた控えめな計算");
   }
   // ---------- 13 売上と個社設定 ----------
@@ -497,11 +513,14 @@ async function main() {
     table(s, [["", ...yrs.slice(1)],
       ["既存の利用料", ...R2.map((r) => fmt(r.stock))], ["新規の利用料", ...R2.map((r) => fmt(r.newLic))], ["導入支援", ...R2.map((r) => fmt(r.setupRev))], ["個社設定", ...R2.map((r) => fmt(r.contract))],
       [{ text: "売上", bold: true }, ...R2.map((r) => ({ text: fmt(r.sales), bold: true }))], ["既存の利用料の割合", ...R2.map((r) => Math.round(r.stock / r.sales * 100) + "%")]],
-      { x: X0, y: top, w: W, colW: [2.95, 1.25, 1.25, 1.25, 1.25, 1.25], rowH: 0.3, size: 9, strongRows: [5], name: "sales" });
-    txt(s, "個社設定の中身（件数×単価の仮置き。当社の導入コンサルタントとエンジニアが行う）", { x: X0, y: 3.32, w: W, h: 0.26, size: 10.5, bold: true });
+      { x: X0, y: top, w: W, colW: [2.95, 1.25, 1.25, 1.25, 1.25, 1.25], rowH: 0.255, size: 8.5, strongRows: [5], name: "sales" });
+    txt(s, "個社設定の中身（件数×単価の仮置き。当社の導入コンサルタントとエンジニアが行う）", { x: X0, y: 2.97, w: W, h: 0.24, size: 10, bold: true });
     table(s, [["年", "1年目", "2年目", "3年目", "4年目", "5年目"], ["中身", "試験導入先の施工管理アプリ連携 2件×300", "連携・帳票の調整 3件×250", "大手の基幹連携600＋2件×250", "2件×275", "大手の追加450＋2件×250"]],
-      { x: X0, y: 3.62, w: W, colW: [0.6, 2.0, 1.55, 1.85, 1.3, 1.9], rowH: [0.28, 0.48], size: 8.5, leftCols: [1, 2, 3, 4, 5], name: "contract" });
-    foot(s, "報告書の書式を整える工程は利用料に含む。有償は標準の出力で足りない連携だけ。粗利は1/3（人件費を原価に振り替え）。作った型は製品に戻す");
+      { x: X0, y: 3.22, w: W, colW: [0.6, 2.0, 1.55, 1.85, 1.3, 1.9], rowH: [0.24, 0.4], size: 8, leftCols: [1, 2, 3, 4, 5], name: "contract" });
+    txt(s, "報告書の型（例）", { x: X0, y: 3.92, w: 5.6, h: 0.24, size: 10, bold: true, color: NAVY });
+    txt(s, [run("・電力会社の指定様式の写真台帳（工種・位置・確認項目・設計と実測）", { breakLine: true }), run("・官公庁の電子納品（デジタル写真管理情報基準に沿った写真と情報）", { breakLine: true }), run("・自社の施工管理アプリ・基幹システムへの出力（有償の個社設定はここ）")], { x: X0, y: 4.16, w: 5.6, h: 0.78, size: 8.5, psa: 2 });
+    s.addImage({ path: path.join(__dirname, "assets", "sample-phototable-row.png"), x: 6.2, y: 3.95, w: 3.4, h: 3.4 * 720 / 2000 });
+    txt(s, "書式を整える工程は利用料に含む。有償は標準で足りない連携だけ（粗利1/3）。作った型は製品に戻す", { x: X0, y: 4.98, w: 5.7, h: 0.24, size: S.note, color: K.gray500 });
   }
   // ---------- 14 オフィス・広告 ----------
   {
@@ -519,7 +538,7 @@ async function main() {
       [{ text: "合計", bold: true }, { text: "500", bold: true }, { text: "100", bold: true }]],
       { x: rx, y: top + 0.3, w: rw, colW: [3.0, 0.7, 0.75], rowH: 0.28, size: 8.5, strongRows: [7], name: "ads" });
     darkBox(s, X0, 4.1, W, 0.77, [lab("費用対効果：", { dark: true }), run("5年目は新規33拠点≒約25社。成約率25%なら商談約100件。500万円÷100件＝1商談5万円、1拠点約15万円。", { breakLine: true }),
-      run("媒体ごとの商談数は仮説。最初の1年で媒体ごとに「名刺→商談→成約」を記録し、効かない媒体はやめる")], 9);
+      run(`商談を取りすぎても、受けるのは導入コンサルタントの上限まで（1人年6拠点）。新規拠点の計画は上限の内側に置いた（上限 ${V.ROLES[4][2].map((n) => n * 6).join("・")}、計画 ${V.GROWTH.newSites.join("・")}）`)], 8.5);
     foot(s, "YouTubeは単独の広告ではなく、事例動画の置き場所。現場の人が「自分の工事で使えるか」を見て、展示会や勉強会から来てもらう");
   }
   // ---------- 15 チーム ----------
@@ -536,18 +555,18 @@ async function main() {
       ["採用費", "", ...T2.map((t) => fmt(t.recruit)), "年収の30%×紹介会社経由50%"]],
       { x: X0, y: top, w: W, colW: [2.2, 0.85, 0.5, 0.5, 0.5, 0.5, 0.5, 3.65], rowH: 0.24, size: 7.5, align: "center", leftCols: [0, 7], strongRows: [9], name: "team" });
     darkBox(s, X0, 4.18, W, 0.7, [lab("社外：", { dark: true }), run(`技術顧問（大学・映像AI）月10万円、業界顧問（電気工事業のOB）月5万円 ＝ 年${V.ADVISORS}万円。`, { breakLine: true }),
-      run("導入コンサルタントは「その年の新規拠点÷6」で先に採用する。外部に委託せず社内に知見を貯める。採用は拠点数の実績に合わせて遅らせられる（p.22）")], 9);
+      run("導入コンサルタントが多い理由：導入支援と個社設定の売上は人の時間で決まり、1人年6拠点が上限。利用料は人に比例しない。営業は商談の件数をこの上限に合わせて調整する。外部に委託せず社内に知見を貯める（p.22）")], 8.5);
     foot(s, "年収はすべて見積（採用市場の相場は要確認）。代表の年収は1年目480万円から段階的に上げる");
   }
   // ---------- 16 収支 ----------
   {
     const s = add(18);
     tag(s, TAGS[18]);
-    heading(s, `収支：10台のままでは5年で黒字にならない。15台なら${firstBlack(OPT.d15)}年目`, "ここまでの前提をすべて入れた5年間の損益（万円）");
+    heading(s, `収支：10台では5年で黒字にならない。12台なら${firstBlack(OPT.d12)}年目`, "ここまでの前提をすべて入れた5年間の損益（万円）");
     const top = 1.12;
     table(s, [["", ...yrs.slice(1)],
       ["売上", ...R2.map((r) => fmt(r.sales))], ["粗利", ...R2.map((r) => fmt(r.gp))], ["粗利率", ...R2.map((r) => Math.round(r.gpRate * 100) + "%")],
-      ["人件費（原価に振り替えた分を除く）", ...R2.map((r) => fmt(r.payroll - (r.setupCost - r.nw * V.setupTravel) - r.contractLabor))], ["採用費", ...R2.map((r) => fmt(r.recruit))], ["その他の経費（AIの学習費を含む）", ...R2.map((r) => fmt(r.other))],
+      ["人件費（原価に振り替えた分を除く）", ...R2.map((r) => fmt(r.payroll - (r.setupCost - r.nw * V.setupTravel) - r.contractLabor))], ["採用費", ...R2.map((r) => fmt(r.recruit))], ["その他の経費（家賃・広告・AIの学習など）", ...R2.map((r) => fmt(r.other))],
       [{ text: "営業利益", bold: true }, ...R2.map((r) => ({ text: tri(r.op), bold: true, color: r.op < 0 ? RED : K.ink }))], ["累積の営業損益", ...R2.map((r) => tri(r.cum))]
       ],
       { x: X0, y: top, w: W, colW: [2.95, 1.25, 1.25, 1.25, 1.25, 1.25], rowH: 0.25, size: 8.5, strongRows: [7], name: "pl" });
@@ -555,11 +574,12 @@ async function main() {
     const op = (v) => ({ text: tri(v), color: v < 0 ? RED : K.ink });
     table(s, [["もし", "黒字化", "5年目の営業利益", "累積赤字のピーク"],
       ["計画どおり（10台）", yr(R2), op(R2[4].op), fmt(-peak(R2))],
+      ["1拠点12台に増やす（黒字ライン）", yr(OPT.d12), op(OPT.d12[4].op), fmt(-peak(OPT.d12))],
       ["1拠点15台に増やす", yr(OPT.d15), op(OPT.d15[4].op), fmt(-peak(OPT.d15))],
       ["解約が年5%", yr(OPT.c5), op(OPT.c5[4].op), fmt(-peak(OPT.c5))],
       ["月18万円に値下げ", yr(OPT.p216), op(OPT.p216[4].op), fmt(-peak(OPT.p216))]],
-      { x: X0, y: 3.78, w: W, colW: [3.2, 1.7, 2.1, 2.2], rowH: 0.22, size: 8, align: "center", leftCols: [0], name: "whatif" });
-    foot(s, `累積赤字のピークは約${(peak(R2) / -10000).toFixed(2)}億円。自己資金は1年目2億円＋3年目5,000万円（p.23）`);
+      { x: X0, y: 3.62, w: W, colW: [3.2, 1.7, 2.1, 2.2], rowH: 0.21, size: 8, align: "center", leftCols: [0], name: "whatif" });
+    foot(s, `黒字ラインは1拠点12台（11台では5年目${tri(OPT.d11[4].op)}万円）。個社設定の人件費は原価で差し引き済み。累積赤字のピークは約${(peak(R2) / -10000).toFixed(2)}億円（p.23）`);
   }
   // ---------- 19 損益分岐点 ----------
   {
@@ -585,7 +605,7 @@ async function main() {
     box(s, { x: X0, y: 3.45, w: W, h: 1.3, fill: K.fill });
     txt(s, [
       lab("なぜ販管費を「固定費」とみなすか："), run("販管費の大半は人件費と家賃で、売上が増えても1年の中では動かない。変動費（AI・保存の費用、導入支援と個社設定の人件費）は原価に入れてある", { breakLine: true }),
-      lab("聞かれたらこう答える："), run(`「5年目は${Y5.staff}人で${Y5.sites}拠点、1人${Y5.sitesPerStaff.toFixed(2)}で約4拠点に届かず赤字です。あと約${Math.ceil((Y5.sga - Y5.gp) / U.gpYear)}拠点分、または1拠点15台で越えます」`, { breakLine: true }),
+      lab("聞かれたらこう答える："), run(`「5年目は${Y5.staff}人で${Y5.sites}拠点、1人${Y5.sitesPerStaff.toFixed(2)}で約4拠点に届かず赤字です。あと約${Math.ceil((Y5.sga - Y5.gp) / U.gpYear)}拠点分、または1拠点12台で越えます」`, { breakLine: true }),
       lab("経営のルール："), run("採用は「期末で1人約4拠点を超える見込み」が立ってから（p.22）"),
     ], { x: X0 + 0.15, y: 3.45, w: W - 0.3, h: 1.3, size: 9.5, valign: "middle", psa: 3 });
     foot(s, `社員1人の販管費は年で動く（1年目${fmt(R[0].sga / R[0].staff)}万円、5年目${fmt(per)}万円）。安全余裕率＝（売上−分岐点売上）÷売上`);
@@ -630,7 +650,7 @@ async function main() {
           { text: c.black ? c.black + "年目" : "5年でしない", color: c.black ? GREEN : RED, bold: true }, { text: tri(M(c.op5)) + "百万円", color: c.op5 < 0 ? RED : K.ink }, { text: tri(M(c.minCash)) + "百万円", color: col, bold: bad }];
       }),
     ], { x: X0, y: 1.12, w: W, colW: [2.9, 2.2, 1.1, 1.45, 1.55], rowH: 0.29, size: 9, leftCols: [1], strongRows: [1], name: "stress" });
-    darkBox(s, X0, 4.2, W, 0.72, [lab("結論：", { dark: true }), run("10台のままでは計画どおりでも5年以内に黒字にならない。値引き・解約・AI費用・年収のどれも赤字を広げる。", { breakLine: true }), run(`守りは2つ。1拠点の台数を増やす（15台で${firstBlack(OPT.d15)}年目に黒字）と、採用を拠点数に合わせて遅らせる（p.22）`)], 9);
+    darkBox(s, X0, 4.2, W, 0.72, [lab("結論：計画の余裕は小さい。", { dark: true }), run("10台では計画どおりでも5年以内に黒字にならず、値引き・解約・AI費用・年収のどれも赤字を広げる。だから撤退ラインと段階投入をセットにした。", { breakLine: true }), run(`守りは2つ。1拠点の台数を増やす（12台で${firstBlack(OPT.d12)}年目に黒字）と、採用を拠点数に合わせて遅らせる（p.22）`)], 8.5);
     foot(s, `最低現金のライン＝4年目の販管費の3か月分（約${M(line)}百万円）。自己資金は全シナリオで同じ（1年目2億円＋3年目0.5億円）。簡易計算（税・償却・運転資本は含めない）`);
   }
 
@@ -669,14 +689,15 @@ async function main() {
     txt(s, "期末の現金残高（簡易計算・百万円）", { x: rx, y: top, w: rw, h: 0.26, size: 10.5, bold: true });
     table(s, [["", ...yrs.slice(1)], ["調達", ...R.map((r) => String(M(r.funding)))], ["営業損益", ...R.map((r) => tri(M(r.op)))], ["期末現金", ...R.map((r) => ({ text: String(M(r.cash)), bold: true }))]],
       { x: rx, y: top + 0.3, w: rw, colW: [1.2, 0.65, 0.65, 0.65, 0.65, 0.65], rowH: 0.3, size: 9, strongRows: [3], name: "cash" });
-    box(s, { x: rx, y: top + 1.65, w: rw, h: 2.0, fill: K.ink });
+    box(s, { x: rx, y: top + 1.6, w: rw, h: 2.15, fill: K.ink });
     txt(s, [
-      run("黒字倒産を防ぐ4つのルール", { bold: true, color: YELLOW, breakLine: true }),
-      run("① 利用料は年額前払い。導入支援は着手金50%", { breakLine: true }),
-      run("② 現金が固定費3か月分を割りそうなら、先に採用を止める", { breakLine: true }),
-      run("③ 資金繰り表で12か月先までの入出金を管理", { breakLine: true }),
-      run("④ 採用は期末で社員1人約4拠点の見込みが立ってから"),
-    ], { x: rx + 0.15, y: top + 1.7, w: rw - 0.3, h: 1.9, size: 9.5, color: K.paper, valign: "middle", psa: 4 });
+      run("黒字倒産（黒字でも現金が尽きる）の起こり方", { bold: true, color: YELLOW, breakLine: true }),
+      run(`① 売掛の回収が遅い（月額後払い・支払いサイト60日なら5年目に約${(R2[4].sales * 60 / 365 / 1e4).toFixed(2)}億円が寝る）`, { breakLine: true }),
+      run("② 拠点が増える前の先行採用　③ 端末込みの料金で端末を先に買う", { breakLine: true }),
+      run("④ 急な拠点増で導入支援の人件費が先に出る　⑤ 税金・賞与の月", { breakLine: true }),
+      run("備え", { bold: true, color: YELLOW, breakLine: true }),
+      run("利用料は年額前払い・導入支援は着手金50%。現金が固定費3か月分を割りそうなら先に採用を止める。12か月先までの資金繰り表で管理する"),
+    ], { x: rx + 0.12, y: top + 1.63, w: rw - 0.24, h: 2.1, size: 8, color: K.paper, valign: "middle", psa: 2 });
     foot(s, "融資・出資は使わないので返済・利息はない。外の資金を入れるなら成熟期（上場）。簡易計算（税・償却・運転資本を除く）");
   }
 
@@ -697,15 +718,16 @@ async function main() {
       ["規模別の内訳（大300・中2,100）", "資本金5,000万円以上 約2,400社を分けた", "仮説"],
       ["電気通信工事の中堅以上", "約700社（完成工事高の比率から）", "仮説"],
       ["1拠点の年額", "標準10台で300万円。大手は支店5拠点", "見積"],
-      ["小規模を外す理由", `書類の量が少なく、1台1日${be}分を満たしにくい`, "見積"],
-    ], { x: X0, y: top + 1.65, w: 6.1, colW: [2.2, 3.3, 0.6], rowH: 0.27, size: 8, leftCols: [1], align: "center", name: "market-assump" });
+      ["小規模を外す理由", "1拠点10台が要らず基盤が重い（書類が少ないわけではない）", "見積"],
+      ["上振れ：小規模の軽いプラン", "基盤＋3台（年132万円）×小規模の1%（約630社）→約8億円", "仮説"],
+    ], { x: X0, y: top + 1.65, w: 6.1, colW: [2.0, 3.5, 0.6], rowH: 0.24, size: 7.5, leftCols: [1], align: "center", name: "market-assump" });
     const rx = 6.7, rw = 2.9;
     box(s, { x: rx, y: top, w: rw, h: 1.5, fill: K.ink });
     txt(s, [run("ターゲット市場", { bold: true, color: YELLOW, breakLine: true }), run(`約${(E.sam / 1e4).toFixed(0)}億円`, { bold: true, fontSize: 20, breakLine: true }), run(`中堅以上 約${fmt(Math.round(E.samSites / 100) * 100)}社`, { fontSize: 9 })], { x: rx + 0.12, y: top + 0.05, w: rw - 0.24, h: 1.4, size: 10, color: K.paper, valign: "middle", psa: 2 });
     box(s, { x: rx, y: top + 1.6, w: rw, h: 1.45, fill: K.fill });
     txt(s, [run("全体市場（第三者の調査）", { bold: true, breakLine: true }), run("建設テック（建築分野）", { breakLine: true }), run("1,845億→3,043億円、年7.4%", { bold: true, breakLine: true }), run("スマートファクトリー（国内）", { breakLine: true }), run("42億→92億米ドル、年9.03%", { bold: true })], { x: rx + 0.12, y: top + 1.65, w: rw - 0.24, h: 1.35, size: 8.5, valign: "middle", psa: 1 });
-    box(s, { x: X0, y: 4.45, w: W, h: 0.48, line: ACC, lw: 1.5 });
-    txt(s, [lab("聞かれたら："), run(`「土台の65,497社は国の統計、規模別の内訳は推計です。業界団体の名簿と経済センサスで数え直します」。5年目の売上は約${(Y5.sites * 300 / 1e4).toFixed(2)}億円で、ターゲット市場の約${(Y5.sites * 300 / 141e2).toFixed(1)}%`)], { x: X0 + 0.15, y: 4.45, w: W - 0.3, h: 0.48, size: 8.5, valign: "middle" });
+    box(s, { x: X0, y: 4.55, w: W, h: 0.4, line: ACC, lw: 1.5 });
+    txt(s, [lab("聞かれたら："), run(`「土台の65,497社は国の統計、規模別の内訳は推計です」。5年目の売上は約${(Y5.sites * 300 / 1e4).toFixed(2)}億円で、ターゲット市場の約${(Y5.sites * 300 / 141e2).toFixed(1)}%`)], { x: X0 + 0.15, y: 4.55, w: W - 0.3, h: 0.4, size: 8.5, valign: "middle" });
     foot(s, "計算は tora_market.js。差し替える統計：国交省「建設業許可業者数調査」業種別・資本金階層別、経済センサス（設備工事業の従業者規模別）");
   }
 
@@ -737,7 +759,7 @@ async function main() {
   {
     const s = add(26);
     tag(s, TAGS[26]);
-    heading(s, "グラスの条件と実証：足りるかを実機で確かめる", "現場の条件と、候補のグラスの公表値。足りない所は記録の仕方と端末の選び方で補う");
+    heading(s, "グラスの条件と実証：足りるかを実機で確かめる", "当社の用途向けの製品はまだない。値段・重さは市販品の公表値を当てはめた仮定で、実機で確かめる");
     const top = 1.15;
     table(s, [["現場の条件", "AIグラス（Ray-Ban Meta 第2世代）", "表示付き（Meta Ray-Ban Display）", "産業用（RealWear）"],
       ["重さ", "約50g", "約69g", "約180g〜"],
@@ -746,7 +768,7 @@ async function main() {
       ["電池", "連続撮影では短い", "約6時間（公表）", "交換式"],
       ["落下・粉じん", "一般向け", "一般向け", "IP66・2m落下（520）"],
       ["保護めがね", "要確認", "要確認", "保護めがねと併用"],
-      ["値段", "約8万円", "約12万円（$799）", "約37万円〜"]],
+      ["値段（仮定）", "約8万円", "約12万円（$799）", "約37万円〜"]],
       { x: X0, y: top, w: 5.75, colW: [1.05, 1.6, 1.55, 1.55], rowH: 0.29, size: 7.5, leftCols: [1, 2, 3], align: "left", name: "device-spec" });
     const rx = 6.35, rw = 3.25;
     box(s, { x: rx, y: top, w: rw, h: 2.6, fill: K.fill });
@@ -761,7 +783,7 @@ async function main() {
       run("④ 新人が独り立ちするまでの期間")], { x: rx + 0.15, y: top + 0.05, w: rw - 0.3, h: 2.5, size: 9, valign: "middle", psa: 2 });
     darkBox(s, X0, 4.0, W, 0.85, [lab("聞かれたら：", { dark: true }), run("「グラスは作りません。標準は普段使いのAIグラスで、要所だけを記録します。厳しい現場は産業用も選べます。端末が進化したら乗り換えます」", { breakLine: true }),
       lab("手元ARの初期コスト：", { dark: true }), run("組立図の3D化が必要。工種ごとのオプション（初期50万円）にして、1種類から始める")], 9);
-    foot(s, "公表値・報道（2024〜2025年）。国内の正規販売・技適・保護めがねの規格・開発キットの国内提供は要確認");
+    foot(s, "公表値・報道（2024〜2025年）。業務用の条件・国内の正規販売・技適・保護めがねの規格・リース料率は未確定。リース代はすべて仮定の金額");
   }
 
   // ---------- 27 データ基盤 ----------
@@ -852,15 +874,15 @@ async function main() {
       ["期末の現金", ...R10.map((r) => fmt(r.cash))]],
       { x: X0, y: 1.1, w: W, colW: [1.5, 0.77, 0.77, 0.77, 0.77, 0.77, 0.77, 0.77, 0.77, 0.77, 0.77], rowH: 0.27, size: 7.5, strongRows: [4], name: "ten" });
     const E = V.EXT, role = (i) => V.ROLES[i][0].replace(/（.*?）/, "");
-    table(s, [["6〜10年目の前提", "6年", "7年", "8年", "9年", "10年"],
-      ["新規の拠点", ...E.newSites.map(String)],
-      ...[2, 3, 4, 5, 6, 7].map((i) => [role(i), ...E.heads[i].map(String)]),
-      ["AIの学習費", ...E.other.ml.map(String)]],
-      { x: X0, y: 3.1, w: 5.4, colW: [1.9, 0.7, 0.7, 0.7, 0.7, 0.7], rowH: 0.2, size: 7.5, name: "ext" });
+    table(s, [["6〜10年目の前提", "年収", "6年", "7年", "8年", "9年", "10年"],
+      ["新規の拠点", "", ...E.newSites.map(String)],
+      ...[2, 3, 4, 5, 6, 7].map((i) => [role(i), String(V.ROLES[i][1]) + "万", ...E.heads[i].map(String)]),
+      ["AIの学習費", "", ...E.other.ml.map(String)]],
+      { x: X0, y: 3.1, w: 5.4, colW: [1.45, 0.6, 0.67, 0.67, 0.67, 0.67, 0.67], rowH: 0.2, size: 7.5, name: "ext" });
     darkBox(s, 6.0, 3.1, 3.6, 1.75, [lab("ポイント", { dark: true, breakLine: true }), run("積み上げ型なので、採用を落とせば6年目に黒字が厚くなる。", { breakLine: true }),
       run("採用を1.3倍にすると黒字は7年目、値下げ20%やAI費用2倍では現金がいったんマイナス（自己資金の追加が要る）", { breakLine: true }),
-      run("電線工場・海外・端末込みの料金は入れていない（上振れ）")], 8.5);
-    foot(s, "代表・CTOは1人のまま。導入コンサルタントは新規÷6＋定着支援、現場監修は印付けの量（81拠点で約1.3人分）に合わせた。オフィス・広告・交通も段階的に増やした");
+      run("電線工場・海外・端末込みの料金は入れていない（上振れ）。黒字でも現金が尽きる場合は p.23", { breakLine: false })], 8.5);
+    foot(s, "年収は会社負担の前。代表720万・CTO1,000万は1人のまま。コンサルは新規÷6＋定着支援、現場監修は印付けの量に合わせた");
   }
 
   // ---------- 31 厳しい質問 ----------
@@ -875,7 +897,7 @@ async function main() {
       ["4,000万円も得するのでは？", "全員ではなく、AIグラスを掛けた班だけで数えています。手戻りは測れてから足します", "p.6〜7"],
       ["グラス代は誰が払う？", `お客様の名義でリース、手続きは当社が代行。10台で年約${fmt(V.leaseSite())}万円です`, "p.29"],
       ["台数が増えると原価は？", "1台の値段が1台の原価を賄うので粗利率は約70%のまま。崩れるのは全編を送る使い方です", "p.11〜12"],
-      ["なぜ5年で黒字にならない？", "人を先に雇うからです。1拠点15台にできれば5年目に黒字です", "p.19・22"],
+      ["なぜ5年で黒字にならない？", "人を先に雇うからです。1拠点12台にできれば5年目に黒字です", "p.18・19"],
       ["獲得が遅れたら？", "採用も遅らせ、台数を増やします。2年目に5拠点未満なら採用を止めます", "p.22"],
       ["解約率の根拠は？", "海外のB2B SaaSの目安から年10%と置きました。日本の実績で更新します", "p.14"],
       ["普段使いのグラスで足りる？", "録画と電池に制約があります。要所だけ記録し、実機で確かめます", "p.26"],
@@ -896,7 +918,7 @@ async function main() {
     table(s, [["項目", "出典"],
       ["電気工事従事者の年収 ★", "厚生労働省「令和5年賃金構造基本統計調査」（月36.74万円×12＋賞与110.06万円＝約551万円）。職業情報提供サイト（令和6年）約548〜551万円"],
       ["建築・土木技術者の年収 ★", "同調査 建築技術者 約642万円（令和6年）・土木技術者 約604万円（令和5年）。施工管理者の区分はないため代用"],
-      ["年間総実労働時間", "厚生労働省「毎月勤労統計調査」令和6年 建設業 月161.5時間（×12＝1,938時間・残業込み）"],
+      ["年間総実労働時間", "厚生労働省「毎月勤労統計調査」令和6年 建設業 月161.5時間（×12＝1,938時間）。総実労働時間＝所定内＋所定外で、残業を含む"],
       ["会社負担の社会保険料", "健康保険 約5.0%・厚生年金9.15%・雇用保険（建設）1.1%・子ども・子育て拠出金0.36%・労災 約1.2%。計 約17%"],
       ["時間外の割増・上限", "労働基準法（割増25%以上、建設業は2024年4月から原則 月45時間・年360時間）"],
       ["建設業の就業者・年齢", "国土交通省（総務省「労働力調査」2024年平均）477万人、55歳以上36.7%"],
@@ -904,10 +926,10 @@ async function main() {
       ["市場の伸び", "矢野経済研究所 No.3789（建設テック）、IMARC Group（Japan Smart Factory）"],
       ["手戻り率・建設投資 ★", "海外研究で工事費の0.4〜6%。建設投資は国交省 2025年度見通し 約75.6兆円"],
       ["グラス・リース ★", "Ray-Ban Meta 第2世代、Meta Ray-Ban Display $799、RealWear Arc 3（国内37万円）。開発キットの映像720p（UploadVR）。リース料率3年約3%"],
-      ["クラウド・AIの単価 ★", "音声文字起こし $0.003／分、オブジェクト保存 約$0.025／GB・月など各社の公表価格"],
+      ["クラウド・AIの単価 ★", "文字起こし $0.003／分、保存 約$0.025／GB・月、Claude Haiku 5.5（$0.10・$0.50）・Sonnet 5.5（$2・$10）／100万トークン"],
       ["解約率の目安", "B2B SaaSの年間解約：大企業5〜10%・中小30〜50%（海外の業界記事。一次調査ではない）"],
       ["競合・国の方針", "日立 ニュースリリース（2025年3月・10月）、日立 Physical AI 事例（日立パワーソリューションズ 2026年7月）、Safie Pocket2、内閣府「人工知能基本計画」"]],
-      { x: X0, y: 1.1, w: W, colW: [2.3, 6.9], rowH: 0.27, size: 7.5, leftCols: [1], name: "sources" });
+      { x: X0, y: 1.1, w: W, colW: [2.1, 7.1], rowH: 0.25, size: 7.2, leftCols: [1], name: "sources" });
     foot(s, "数字はすべて tora_v2.js から出力。前提を変えると、本編・やさしい版・この資料の表が同じ式で計算し直される");
   }
 

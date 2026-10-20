@@ -335,20 +335,21 @@ async function main() {
     txt(s, [lab("式："), run(`10台 × 年240日 ×（職長15分×${hr(V.H.electrician)}円 ＋ 施工管理者20分×${hr(V.H.manager)}円）`, { breakLine: true }), run(`＝ 年 約${man(CV.docs)}万円`, { bold: true, fontSize: 18, color: ACC })],
       { x: X0 + 0.14, y: top, w: lw - 0.28, h: 1.05, size: 10, valign: "middle", psa: 3 });
     txt(s, `時給＝統計の年収×会社負担${V.WAGE.employerLoad}÷残業を含む年${man(V.WAGE.annualHours)}時間（毎月勤労統計 令和6年）。1台1日35分は仮説で、実証で測る`, { x: X0, y: top + 1.1, w: lw, h: 0.4, size: 8.5, color: K.gray700 });
-    const bars = [["効果（書類の時間）", CV.docs, ACC], ["お客様の支払い", CV.cost, K.ink], ["手戻り削減を含む場合", CV.docs + CV.rework, K.gray500]];
-    const sc = (lw - 2.85) / (CV.docs + CV.rework);
+    const d200 = V.customerValue({ plan: { workDays: 200 } });
+    const bars = [["効果（書類の時間）", CV.docs, ACC], ["使うのが年200日なら", d200.docs, K.gray500], ["お客様の支払い", CV.cost, K.ink]];
+    const sc = (lw - 2.85) / CV.docs;
     bars.forEach(([n, v, c], i) => {
       const y = top + 1.55 + i * 0.44;
       txt(s, n, { x: X0, y, w: 1.85, h: 0.36, size: 9.5, bold: true, valign: "middle" });
       box(s, { x: X0 + 1.9, y: y + 0.06, w: v * sc, h: 0.24, fill: c });
       txt(s, man(v) + "万円", { x: X0 + 1.95 + v * sc, y, w: 0.9, h: 0.36, size: 10, bold: true, valign: "middle" });
     });
-    txt(s, `支払い＝利用料300万円＋AIグラスのリース約${man(V.leaseSite())}万円。手戻り＝完成工事高30億円×2%×対象工種30%×削減20%（上振れ・計画外）`, { x: X0, y: top + 2.9, w: lw, h: 0.4, size: 8.5, color: K.gray700 });
+    txt(s, `支払い＝利用料300万円＋AIグラスのリース約${man(V.leaseSite())}万円。手戻りの削減は会社ごとに違い、測る手間も見合わないので数えない`, { x: X0, y: top + 2.9, w: lw, h: 0.4, size: 8.5, color: K.gray700 });
     const rx = 6.1, rw = 3.5;
     box(s, { x: rx, y: top, w: rw, h: 1.45, fill: K.ink });
     txt(s, [lab("お客様が元を取る条件", true), run("", { breakLine: true }), run(`1台1日 ${be}分`, { bold: true, fontSize: 22, breakLine: true }), run("想定は35分。実証の合格ラインにする", { fontSize: 9 })], { x: rx + 0.14, y: top, w: rw - 0.28, h: 1.45, size: 10, color: K.paper, valign: "middle", psa: 3 });
     const fy = CV.cost + V.PLAN.setup;
-    table(s, [["1拠点10台", "万円"], ["初年度の支払い（導入支援200を含む）", man(fy)], ["初年度の支払いは効果の", `約${Math.round(fy / (CV.docs / 12))}か月分`], ["2年目以降の差（毎年）", `＋${man(CV.docs - CV.cost)}`], ["手戻り削減を含む倍率", `約${CV.ratioUp.toFixed(1)}倍`]],
+    table(s, [["1拠点10台", "万円"], ["初年度の支払い（導入支援200を含む）", man(fy)], ["初年度の支払いは効果の", `約${Math.round(fy / (CV.docs / 12))}か月分`], ["2年目以降の差（毎年）", `＋${man(CV.docs - CV.cost)}`], ["年200日でも", `約${d200.ratio.toFixed(2)}倍`]],
       { x: rx, y: top + 1.58, w: rw, colW: [2.4, 1.1], rowH: 0.32, size: 9.5, name: "roi" });
     box(s, { x: X0, y: 4.45, w: W, h: 0.42, line: ACC, lw: 1.5 });
     txt(s, [lab("新人の指導："), run("他の業務と切り分けられないので金額にはしない。独り立ちまでの月数・付き添い時間・やり直し件数で測る")], { x: X0 + 0.14, y: 4.45, w: W - 0.28, h: 0.42, size: 9.5, valign: "middle" });
