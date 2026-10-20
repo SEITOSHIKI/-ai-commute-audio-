@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 資料一式をつくり直す：pptx → pdf → 台本つきpdf・配布用pdf・台本md → zip
+# 裏取りのExcelとPDFは別に作る：SK=<スキルのフォルダ> bash tools/xlsx/make_all.sh（このスクリプトはできたものをzipに入れる）
 # 使い方：SOFFICE="python3 <pptxスキル>/scripts/office/soffice.py" NODE_PATH=<node_modules> bash tools/build_all.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
