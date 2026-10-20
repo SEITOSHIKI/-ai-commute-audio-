@@ -13,7 +13,7 @@ let DRAWING = false;
 // Colors used inside the primitives (text, frames, line art). drawing() replaces them.
 const P = { text: K.ink, frame: K.ink, title: K.ink, line: "#1A1A1A", acc: "#B8692E", hi: "#B8692E", suit: "#1A1A1A", glass: "#B8692E", helmet: "#fff", badge: "#B8692E", bad: "B8692E" };
 const LOGOS = path.join(__dirname, "../design-system/georec/logos");
-const TAGLINE = "現場の勘を、次の担い手へ。";
+const TAGLINE = "現場の勘を次の担い手へ";
 
 async function png(svgOrFile, density = 600) {
   const src = svgOrFile.startsWith("<") ? Buffer.from(svgOrFile) : path.join(LOGOS, svgOrFile + ".svg");

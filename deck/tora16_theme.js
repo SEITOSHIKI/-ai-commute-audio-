@@ -68,7 +68,7 @@ async function setup(pres, title, notes) {
     { line: { x: 7.92, y: 5.2, w: 0, h: 0.305, line: { color: NAVY, width: 0.75 } } },
     { line: { x: 9.3, y: 5.2, w: 0, h: 0.305, line: { color: NAVY, width: 0.75 } } },
     { image: { x: 8.135, y: 5.252, w: 0.95, h: 0.95 * 120 / 560, data: logo } },
-    { text: { text: "現場の勘を、次の担い手へ。", options: { x: 0.4, y: 5.22, w: 3.5, h: 0.26, fontFace: F, fontSize: 8, color: GRAY5, margin: 0, valign: "middle" } } },
+    { text: { text: "現場の勘を次の担い手へ", options: { x: 0.4, y: 5.22, w: 3.5, h: 0.26, fontFace: F, fontSize: 8, color: GRAY5, margin: 0, valign: "middle" } } },
   ];
   pres.defineSlideMaster({ title: "KT", background: { color: PAPER }, objects: frame,
     slideNumber: { x: 9.3, y: 5.22, w: 0.58, h: 0.27, fontFace: F, fontSize: 9, bold: true, color: NAVY, align: "center", margin: 0 } });

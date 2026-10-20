@@ -54,7 +54,7 @@ function logotype(theme, tagline) {
   let s = mark(theme);
   s += `<text x="134" y="66" fill="${t.ink}" font-family="Arial, Helvetica, Liberation Sans, sans-serif" font-size="52" font-weight="700" letter-spacing="3">KAN<tspan fill="${t.acc}">TSUGI</tspan></text>`;
   s += `<text x="136" y="100" fill="${t.sub}" font-family="IPAGothic, Meiryo, Hiragino Sans, sans-serif" font-size="22" letter-spacing="6">カンツギ｜勘継</text>`;
-  if (tagline) s += `<text x="136" y="138" fill="${t.acc}" font-family="IPAGothic, Meiryo, Hiragino Sans, sans-serif" font-size="17" letter-spacing="2">現場の勘を、次の担い手へ。</text>`;
+  if (tagline) s += `<text x="136" y="138" fill="${t.acc}" font-family="IPAGothic, Meiryo, Hiragino Sans, sans-serif" font-size="17" letter-spacing="2">現場の勘を次の担い手へ</text>`;
   return svg(s, 560, tagline ? 150 : 120, "KANTSUGI カンツギ");
 }
 

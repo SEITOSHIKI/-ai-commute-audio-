@@ -55,6 +55,6 @@
 |---|---|
 | `kantsugi-cube-color.svg` / `-mono` / `-reverse` | マーク単体 |
 | `kantsugi-logotype-color.svg` / `-mono` / `-reverse` | マーク＋ロゴタイプ。スライド右下は color |
-| `kantsugi-logotype-tagline.svg` / `-tagline-reverse` | ＋「現場の勘を、次の担い手へ。」 |
+| `kantsugi-logotype-tagline.svg` / `-tagline-reverse` | ＋「現場の勘を次の担い手へ」 |
 
 生成は `node build_kantsugi_logo.js`。`gen3-*`（三現ワークス）と `georec-*` は旧版で、新しい資料では使わない。
