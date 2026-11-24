@@ -7,14 +7,14 @@
     <docs>http://www.rssboard.org/rss-specification</docs>
     <generator>python-feedgen</generator>
     <language>ja</language>
-    <lastBuildDate>Mon, 23 Nov 2026 00:51:16 +0000</lastBuildDate>
-    <pubDate>Mon, 23 Nov 2026 00:51:16 +0000</pubDate>
+    <lastBuildDate>Tue, 24 Nov 2026 04:51:08 +0000</lastBuildDate>
+    <pubDate>Tue, 24 Nov 2026 04:51:08 +0000</pubDate>
     <item>
-      <title>通勤AIニュース 2026-11-23</title>
+      <title>通勤AIニュース 2026-11-24</title>
       <description>本日の主要AIニュースを、日本語でやさしく要点解説。</description>
-      <guid isPermaLink="false">https://seitoshiki.github.io/-ai-commute-audio-/2026-11-23-ai-commute.mp3</guid>
-      <enclosure url="https://seitoshiki.github.io/-ai-commute-audio-/2026-11-23-ai-commute.mp3" length="43907491" type="audio/mpeg"/>
-      <pubDate>Mon, 23 Nov 2026 00:51:16 +0000</pubDate>
+      <guid isPermaLink="false">https://seitoshiki.github.io/-ai-commute-audio-/2026-11-24-ai-commute.mp3</guid>
+      <enclosure url="https://seitoshiki.github.io/-ai-commute-audio-/2026-11-24-ai-commute.mp3" length="41677678" type="audio/mpeg"/>
+      <pubDate>Tue, 24 Nov 2026 04:51:08 +0000</pubDate>
     </item>
   </channel>
 </rss>
